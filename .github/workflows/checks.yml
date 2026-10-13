@@ -148,8 +148,14 @@ jobs:
     # La suite intera ha senso solo dove il ponte esiste: un runner self-hosted con
     # le Crafting Apps installate. Si attiva con la variabile di repository
     # CRAFTBRIDGE_SELF_HOSTED=1 (Settings -> Secrets and variables -> Actions -> Variables).
+    #
+    # Solo su push in `main` e su avvio manuale, **mai** su una pull request: questo
+    # repository e' pubblico, e una PR (anche da un fork) farebbe girare codice di
+    # sconosciuti su questa macchina, che non e' una macchina usa e getta. Il job
+    # hosted resta invece attivo sulle PR, dove non c'e' niente da rovinare.
     name: suite completa (runner self-hosted)
-    if: ${{ vars.CRAFTBRIDGE_SELF_HOSTED == '1' }}
+    if: ${{ vars.CRAFTBRIDGE_SELF_HOSTED == '1' &&
+            (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
     runs-on: [self-hosted, windows, craftbridge]
     timeout-minutes: 30
     steps:
