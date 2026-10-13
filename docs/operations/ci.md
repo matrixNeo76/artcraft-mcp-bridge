@@ -41,7 +41,7 @@ skipped and does not colour the badge.
 | Syntax | `py_compile` on every tool | a syntax error must not reach an agent that invokes them |
 | Interfaces | `--help` of every tool with `argparse` | the interface exists and answers (stdio servers are skipped: a `--help` would start them waiting for stdin) |
 | App table | the 11 documented apps and ports | the table is a single source: config and diagnosis read this one |
-| Deterministic installer | two rounds of `--json` identical, 11 entries | idempotence: two runs must not produce different plans |
+| Deterministic installer | two rounds of `--json` identical, and the entries are the shim's 11 plus the translator's one | idempotence, and the number is asked of the table instead of being written here: the fixed count went stale the first time an app changed road (expected 11, produced 12) |
 | OKF bundle | `uvx --from "okfgen==0.1.3" okfgen validate docs --strict` | the documentation stays consumable by another tool; the version is pinned so it does not depend on the newest release |
 | Suite | `craft-bridge-tests.py --static --ci` | the cases runnable without the bridge, with motivated skips |
 | Artifact | `reports/craft-bridge-tests.*` | the run report stays downloadable, even if the run fails |

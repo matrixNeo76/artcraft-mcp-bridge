@@ -99,8 +99,23 @@ jobs:
           if ($diff) { throw "due giri diversi: le entry non sono deterministiche" }
           $entries = (Get-Content "$tmp/a.json" -Raw | ConvertFrom-Json).mcpServers.PSObject.Properties
           $n = ($entries | Measure-Object).Count
-          if ($n -ne 11) { throw "entry generate: $n, attese 11" }
-          "ok: $n entry, due giri identici"
+          # Le entry attese non sono un numero scritto qui: sono quelle della tabella
+          # dello shim, piu' le app servite dal traduttore (PdfCraft, che non passa
+          # dallo shim). Il conteggio fisso e' invecchiato al primo push in cui una app
+          # ha cambiato strada: attese 11, generate 12.
+          $shim = python tools/craft-bridge-mcp.py --dump-apps | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw "--dump-apps e' fallito" }
+          $shimSlugs = @($shim.PSObject.Properties.Name)
+          $missing = @($shimSlugs | Where-Object { $entries.Name -notcontains $_ })
+          if ($missing.Count) { throw "entry mancanti per: $($missing -join ', ')" }
+          $extra = @($entries | Where-Object { $shimSlugs -notcontains $_.Name })
+          if ($extra.Count -ne 1) {
+            throw "entry fuori dallo shim: $($extra.Count), attesa 1 (quella del traduttore: se e' 0, PdfCraft non passa piu' dal traduttore)"
+          }
+          if (($extra[0].Value.args -join ' ') -notmatch 'craft-bridge-ui') {
+            throw "l'entry fuori dallo shim non nomina il traduttore: $($extra[0].Name)"
+          }
+          "ok: $n entry ($($shimSlugs.Count) dello shim + $($extra[0].Name) dal traduttore), due giri identici"
 
       - name: uv (serve al validatore OKF)
         # `uvx` non e' presente sui runner GitHub: e' stato il primo guasto
