@@ -12,4 +12,5 @@
 * **Misura**: 11 app su 12 guidabili e verificate dal vivo; 13/13 entry della config eseguite col comando reale; suite di guasti 10/10, due giri di fila identici.
 * **Installazione**: 13 server MCP in `~/.agents/mcp.json`, con il canale di controllo sulle porte attese.
 * **Aggiunta**: modalita' `--ci` della suite (salta i casi d'ambiente motivandoli) e workflow di integrazione continua in `.github/workflows/checks.yml`, con badge nel README.
+* **Correzione**: il primo giro della CI ha trovato un terzo difetto del workflow: `uvx` non esiste sui runner GitHub. Ora lo porta `astral-sh/setup-uv` e la versione del validatore e' fissata (`okfgen==0.1.3`).
 * **Correzione**: due difetti trovati eseguendo gli step del workflow in locale: in PowerShell `"$slug: ..."` viene letto come variabile con drive (`InvalidVariableReferenceWithDrive`, serve `"${slug}: ..."`) e il conteggio delle proprieta' di un oggetto JSON richiede `Measure-Object`, non `.Count`.

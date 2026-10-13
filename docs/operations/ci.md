@@ -43,7 +43,7 @@ saltato e non colora il badge.
 | Interfacce | `--help` di ogni strumento con `argparse` | l'interfaccia esiste e risponde (i server stdio sono saltati: un `--help` li farebbe partire in attesa di stdin) |
 | Tabella delle app | le 11 app e le porte documentate | la tabella e' una sola fonte: config e diagnosi leggono questa |
 | Installer deterministico | due giri di `--json` identici, 11 entry | idempotenza: due esecuzioni non devono produrre piani diversi |
-| Bundle OKF | `uvx okfgen validate docs --strict` | la documentazione resta consumabile da un altro strumento |
+| Bundle OKF | `uvx --from "okfgen==0.1.3" okfgen validate docs --strict` | la documentazione resta consumabile da un altro strumento; versione fissata per non dipendere dal rilascio piu' recente |
 | Suite | `craft-bridge-tests.py --static --ci` | i casi eseguibili senza ponte, con i salti motivati |
 | Artefatto | `reports/craft-bridge-tests.*` | il report della run resta scaricabile, anche se la run fallisce |
 
@@ -62,12 +62,19 @@ La prova di questa distinzione si fa in tre modi, tutti eseguiti prima di pubbli
 
 # Come si provano gli step senza pubblicare
 
-Gli step sono stato eseguiti in locale **estraendoli dal file del workflow** ed eseguendoli
-con PowerShell (`powershell -NoProfile -ExecutionPolicy Bypass -File step.ps1`), cosi' cio'
-che gira in CI e cio' che e' stato verificato sono lo stesso testo. Le due cose che questo
-ha trovato: `"$slug: ..."` in PowerShell viene letto come variabile con drive
-(`InvalidVariableReferenceWithDrive`) e va scritto `"${slug}: ..."`; e il conteggio delle
-proprieta' di un oggetto JSON va fatto con `Measure-Object`, non con `.Count`.
+Gli step sono stati eseguiti in locale **estraendoli dal file del workflow**
+(`powershell -NoProfile -ExecutionPolicy Bypass -File step.ps1`), cosi' cio' che gira in CI
+e cio' che e' stato verificato sono lo stesso testo; poi la CI stessa, al primo push, ha
+finito il lavoro. Le tre cose che questo ha trovato:
+
+* in PowerShell `"$slug: ..."` viene letto come **variabile con drive**
+  (`InvalidVariableReferenceWithDrive`): va scritto `"${slug}: ..."`. Lo step moriva con
+  quell'errore invece di dire cosa non andava;
+* il conteggio delle proprieta' di un oggetto JSON richiede `Measure-Object`, non `.Count`
+  (che stampava un `1` per riga);
+* **`uvx` non esiste sui runner GitHub**: serve il passo `astral-sh/setup-uv`, e la versione
+  del validatore va fissata (`okfgen==0.1.3`), altrimenti un suo rilascio puo' far fallire
+  un push in cui non e' cambiato niente. Questo l'ha trovato la CI stessa, al primo push.
 
 # Relazioni
 
