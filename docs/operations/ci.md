@@ -49,6 +49,12 @@ lives:
 | Log | `C:\Users\auresystem\actions-runner-craftbridge\runner.log` |
 | Online check | `gh api repos/<owner>/<repo>/actions/runners` → `"status": "online"` |
 
+**One detail that looks like a mistake.** `gh api .../actions/runners` lists the labels as
+`self-hosted, Windows, X64, craftbridge`: `Windows` is GitHub's own default label and registration
+keeps it even when the `--labels` list writes `windows`. Matching is case-insensitive, so
+`runs-on: [self-hosted, windows, craftbridge]` finds the runner all the same - the name that has to
+match is the one the job asks for, not the one GitHub displays.
+
 Prerequisites on the machine: `python` 3.12 in the PATH and the bridge installed
 (`python tools/craft-bridge-config.py --apply`), because the diagnosis looks at what is
 actually running. PowerShell 7 is **not** required: the hosted job uses `pwsh`, which GitHub
