@@ -68,11 +68,11 @@ operazioni, difetti trovati). Il testo lungo e completo, con tutte le misure, è
 [docs/reference/craft-bridge.md](docs/reference/craft-bridge.md).
 
 ```bash
-uvx okfgen validate docs --strict                      # conforme: 28 concetti, 0 errori
+uvx okfgen validate docs --strict                      # conforme: 29 concetti, 0 errori
 uvx okfgen visualize docs -o reports/okf-graph.html    # grafo interattivo del bundle
 ```
 
-Il grafo generato è in [reports/okf-graph.html](reports/okf-graph.html): 28 nodi, 109 relazioni.
+Il grafo generato è in [reports/okf-graph.html](reports/okf-graph.html): 29 nodi, 114 relazioni.
 
 ## Controlli automatici
 
@@ -96,4 +96,6 @@ runner self-hosted con le app installate (`CRAFTBRIDGE_SELF_HOSTED=1`). Dettagli
 
 ## Licenza
 
-Da decidere prima della pubblicazione (nessun file `LICENSE` è ancora presente).
+**MIT** — il testo completo è in [LICENSE](LICENSE): uso, modifica e ridistribuzione
+liberi, anche dentro prodotti chiusi, purché l'avviso di copyright e la licenza restino
+insieme al software. Il software è fornito così com'è, senza garanzie.

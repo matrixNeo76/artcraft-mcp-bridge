@@ -18,6 +18,7 @@ strumento dichiara cosa ha provato, e quando non lo sa lo dice.
 | `reports/` | artefatti generati; è il default di output degli strumenti, non la cartella da cui li invochi |
 | `docs/` | documentazione in **OKF v0.2** (bundle: `docs/index.md`) |
 | `README.md`, `ROADMAP.md` | panoramica e prossimi passi |
+| `LICENSE` | licenza MIT del progetto: non si modifica, e un file nuovo che entra nel repo ne eredita i termini |
 
 ## Regole che non si violano
 
