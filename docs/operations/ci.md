@@ -96,13 +96,13 @@ the bridge exists. A scheduled task "at logon" would do the same but needs admin
 
 **It starts once.** The launcher is **idempotent**: if a listener of this folder is already alive
 (exit and log back in inside the same session, double click on the entry) it writes a line to
-`start-runner.log` and stops, instead of registering a second listener on the same runner. That is
-what check it uses, and how it was proved:
+`start-runner.log` and stops, instead of registering a second listener on the same runner. Which
+check it uses, and how it was proved:
 
 | Attempt | Outcome |
 |---|---|
 | `Get-CimInstance -Filter "Name='Runner.Listener.exe'"` inside a `for /f` | **wrong**: cmd eats the escaped quotes, PowerShell receives `Name 'Runner.Listener.exe'`, the query is invalid and the count comes out `0` — a check that checks nothing |
-| `Get-Process Runner.Listener | Where-Object { $_.Path -like '<dir>bin*' }` | right: `1` with the listener alive, `0` without |
+| `Get-Process Runner.Listener \| Where-Object { $_.Path -like '<dir>bin*' }` | right: `1` with the listener alive, `0` without |
 | the launcher with a listener alive | exit 0, one line in `start-runner.log`, **still one** listener process |
 | the listener stopped, then the launcher | new listener in the user's session, online, and a dispatched run was taken (`Running job` in `runner.log`) |
 
@@ -115,7 +115,7 @@ the one that cannot be written).
 old session for about two minutes: the new listener gets `A session for this runner already exists`
 and `Conflict. Retrying until reconnected.`, then creates the session and prints `Listening for
 Jobs`. A run dispatched **inside that window** can stay queued forever even after the reconnection -
-renumber the dispatch and it starts immediately. Measured: killed at 21:25 local, conflict until
+dispatch it again and it starts immediately. Measured: killed at 21:25 local, conflict until
 19:27:40Z, `Listening for Jobs`; the job dispatched at 19:26:51Z stayed `queued`, the one dispatched
 at 19:33 took the runner at 19:33:48Z and succeeded. So: after a restart, dispatch again instead of
 staring at the queue.
