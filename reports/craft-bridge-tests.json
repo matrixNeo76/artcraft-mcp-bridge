@@ -1,5 +1,5 @@
 {
-  "when": "2026-10-13T17:24:24",
+  "when": "2026-10-13T17:39:04",
   "host": "wkai01",
   "python": "3.12.10",
   "modes": {
@@ -12,8 +12,8 @@
     "craft-bridge-ident.py": "8df181789548",
     "craft-bridge-doctor.py": "a84f864bc053",
     "craft-bridge-config.py": "7776f22be252",
-    "craft-bridge-feed.py": "e134b02049ac",
-    "craft-bridge-tests.py": "f660a0079e28"
+    "craft-bridge-feed.py": "8f0bf116b72d",
+    "craft-bridge-tests.py": "6097d6b01036"
   },
   "cases": [
     {
@@ -21,28 +21,28 @@
       "kind": "static",
       "state": "PASS",
       "detail": "doctor: nessuna azione",
-      "seconds": 0.9
+      "seconds": 1.0
     },
     {
       "case": "shim installato stantio",
       "kind": "static",
       "state": "PASS",
       "detail": "accusato e riparato dall'azione indicata",
-      "seconds": 2.1
+      "seconds": 2.2
     },
     {
       "case": "entry di config sbagliata",
       "kind": "static",
       "state": "PASS",
       "detail": "doctor e installer concordano: 1 entry da aggiornare",
-      "seconds": 1.2
+      "seconds": 1.3
     },
     {
       "case": "percorso inesistente",
       "kind": "static",
       "state": "PASS",
       "detail": "FIX percorsi: cadcraft.command",
-      "seconds": 0.8
+      "seconds": 0.9
     },
     {
       "case": "eseguibile mancante",
@@ -59,6 +59,13 @@
       "seconds": 0.0
     },
     {
+      "case": "byte pubblicati contro installati",
+      "kind": "unit",
+      "state": "PASS",
+      "detail": "uguali ok, diversi FIX, archivio manomesso FIX, assente nota, cli_zip preferito",
+      "seconds": 0.0
+    },
+    {
       "case": "feed assente non e' un guasto",
       "kind": "unit",
       "state": "PASS",
@@ -70,7 +77,7 @@
       "kind": "static",
       "state": "PASS",
       "detail": "assente 3, illeggibile 3, estraneo 0 (nessun guasto inventato)",
-      "seconds": 1.7
+      "seconds": 2.0
     },
     {
       "case": "porta chiusa",
@@ -98,30 +105,27 @@
       "kind": "e2e",
       "state": "PASS",
       "detail": "GridCraft su 7972: doctor e ident lo riconoscono",
-      "seconds": 7.3
+      "seconds": 7.1
     },
     {
       "case": "credenziale rifiutata",
       "kind": "e2e",
       "state": "PASS",
       "detail": "token diverso: accusato da doctor e ident (valore mai stampato)",
-      "seconds": 5.6
+      "seconds": 5.5
     }
   ],
-  "passed": 13,
+  "passed": 14,
   "failed": 0,
   "skipped": 0,
   "ok": true,
-  "seconds": 44.8,
-  "compared_with": "2026-10-13T16:46:11",
-  "previous_seconds": 44.7,
+  "seconds": 45.1,
+  "compared_with": "2026-10-13T17:24:24",
+  "previous_seconds": 44.8,
   "changes": [
-    "`confronto col feed del launcher`: nuovo (PASS)",
-    "`feed assente non e' un guasto`: nuovo (PASS)",
-    "`feed illeggibile o estraneo`: nuovo (PASS)",
-    "`craft-bridge-doctor.py`: e16e1ab9f82a -> a84f864bc053",
-    "`craft-bridge-feed.py`: nuovo strumento (e134b02049ac)",
-    "`craft-bridge-tests.py`: 1571ea4262fb -> f660a0079e28"
+    "`byte pubblicati contro installati`: nuovo (PASS)",
+    "`craft-bridge-feed.py`: e134b02049ac -> 8f0bf116b72d",
+    "`craft-bridge-tests.py`: f660a0079e28 -> 6097d6b01036"
   ],
   "report_files": {
     "json": "C:\\Users\\auresystem\\repos\\artcraft-mcp-bridge\\reports\\craft-bridge-tests.json",

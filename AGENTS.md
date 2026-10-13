@@ -96,4 +96,6 @@ uvx okfgen visualize docs -o reports/okf-graph.html      # grafo dei nodi e dell
   avrebbe potuto far perdere il server MCP).
 - Un peer che accetta e tace **non è** un peer vivo: senza handshake il modo bridged
   diventa un headless travestito.
+- Un pacchetto pubblicato **non** è un eseguibile: lo `sha256` del feed è dell'archivio (MSI, zip portabile, AppImage), e la CLI sta dentro. Per confrontarla si legge il membro in memoria, e il nome del membro dipende dal sistema (`<slug>-cli.exe` su Windows); un MSI o un .dmg non si aprono con la libreria standard, quindi per quelle app i byte restano non confrontati — e va detto, non aggirato.
+- Una prova che non c'è non è una prova passata: se il file da confrontare manca, il verdetto è una nota con il comando per procurarselo, non un "ok".
 - `reports/` è versionato apposta: i report sono la memoria delle esecuzioni passate.

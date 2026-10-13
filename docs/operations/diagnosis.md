@@ -33,7 +33,9 @@ sources:
 3. `tests` - se hai toccato shim, ident o doctor, la suite dice subito se il
    comportamento e' cambiato.
 4. `feed` - quando sospetti che la versione che gira non sia quella pubblicata:
-   confronta le due cose e dice su quale app e su quale pacchetto si appoggia.
+   confronta le due cose e dice su quale app e su quale pacchetto si appoggia. Con
+   `--bytes` va oltre la dichiarazione: confronta l'eseguibile con quello dentro il
+   pacchetto pubblicato, e `--download <app>` prende il pacchetto (una app alla volta).
 
 # Leggere i report nel tempo
 
@@ -50,6 +52,8 @@ spariti, impronte degli strumenti. Guarda la sezione *Confronto* di
 | `FIX porta N: gira una build diversa` | l'eseguibile installato non e' quello configurato |
 | `nota pubblicato: il launcher pubblica altro` | c'e' un aggiornamento: il ponte funziona lo stesso, si aggiorna dal launcher |
 | `nota pubblicato: nessun confronto` | il launcher non c'e' o il suo feed non si legge: non e' un guasto del ponte |
+| `FIX byte <app>: non e' quello pubblicato` | l'archivio in cache non corrisponde al suo sha256: cancellalo e riscaricalo |
+| `FIX byte <app>: <a> != <b> dentro <archivio>` | l'eseguibile installato non e' quello pubblicato: reinstalla l'app dal launcher |
 | `un'altra app` sulla porta | la porta e' occupata da una app diversa: chiudi o cambia porta |
 | `l'app ha rifiutato la credenziale` | il token in config non e' quello dell'app |
 

@@ -18,6 +18,7 @@ o `craft-bridge-launch.py`, pretende l'esito giusto e poi rimette a posto.
     porta chiusa                  ident / shim                 unreachable / headless
     installata != pubblicata      feed / doctor                scostamento / nota
     feed assente o illeggibile    feed                         uscita 3 (non un guasto)
+    byte pubblicati != installati feed                         FIX byte (archivio manomesso incluso)
 
 Regole di sicurezza, applicate sempre:
 
@@ -69,6 +70,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import zipfile
 from datetime import datetime
 from pathlib import Path
 
@@ -347,6 +349,82 @@ def t_feed_compare(run: Runner) -> tuple[str, str]:
                      f"di byte")
 
 
+@case("byte pubblicati contro installati", "unit")
+def t_feed_bytes(run: Runner) -> tuple[str, str]:
+    """La CLI installata e' quella dentro il pacchetto? Con archivi finti, senza rete."""
+    def digest(path: Path) -> str:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+
+    installed_dir = run.tmp / "installati"
+    installed_dir.mkdir()
+    mine = installed_dir / "alpha-cli.exe"
+    mine.write_bytes(b"eseguibile di prova\n")
+    diverso = installed_dir / "beta-cli.exe"
+    diverso.write_bytes(b"altra build\n")
+    archives = run.tmp / "archivi"
+    archives.mkdir()
+
+    def make_zip(name: str, members: dict) -> Path:
+        path = archives / name
+        with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as bundle:
+            for member, data in members.items():
+                bundle.writestr(member, data)
+        return path
+
+    alpha = make_zip("alpha-1.0.0-windows-x64-portable.zip",
+                     {"alpha-1.0.0-windows-x64-portable/alpha-cli.exe": mine.read_bytes(),
+                      "alpha-1.0.0-windows-x64-portable/README.md": b"x"})
+    beta = make_zip("beta-1.0.0-windows-x64-portable.zip",
+                    {"beta-1.0.0-windows-x64-portable/beta-cli.exe": b"byte diversi\n"})
+
+    def asset(path: Path) -> dict:
+        return {"name": path.name, "sha256": digest(path),
+                "size_bytes": path.stat().st_size,
+                "platform": {"os": "windows", "arch": "x64", "package_type": "portable_zip"}}
+
+    problems = []
+    def want(condition: bool, why: str) -> None:
+        if not condition:
+            problems.append(why)
+
+    ok = FEED.compare_cli_bytes(alpha, asset(alpha), "alpha", mine)
+    want(ok["state"] == "ok" and "byte per byte" in ok["detail"], f"byte uguali non riconosciuti: {ok}")
+    bad = FEED.compare_cli_bytes(beta, asset(beta), "beta", diverso)
+    want(bad["state"] == "fail" and bad["kind"] == "bytes", f"byte diversi non accusati: {bad}")
+    manomesso = FEED.compare_cli_bytes(alpha, dict(asset(alpha), sha256="0" * 64), "alpha", mine)
+    want(manomesso["state"] == "fail" and manomesso["kind"] == "hash",
+         f"archivio non pubblicato non accusato: {manomesso}")
+    assente = FEED.compare_cli_bytes(alpha, asset(alpha), "alpha", installed_dir / "manca.exe")
+    want(assente["state"] == "nota", f"CLI installata assente non e' una nota: {assente}")
+    membro = FEED.compare_cli_bytes(alpha, asset(alpha), "alpha", installed_dir / "gamma-cli.exe")
+    want(membro["state"] == "nota", f"membro inesistente non e' una nota: {membro}")
+    want(FEED.extract_member(alpha, "nonesiste.exe") is None, "estratto un membro che non c'e'")
+
+    # La preferenza fra artefatti: l'archivio della sola CLI prima del pacchetto grande.
+    feed = {"apps": {"alpha": {"repo": "storytold/alpha", "version": "1.0.0", "assets": [
+        dict(asset(alpha)),
+        {"name": "alpha-cli-1.0.0-windows-x64.zip", "sha256": "1" * 64, "size_bytes": 1,
+         "platform": {"os": "windows", "arch": "x64", "package_type": "cli_zip"}}]}}}
+    scelto = FEED.archive_for(feed["apps"]["alpha"], "windows", "x64")
+    want(scelto and scelto["name"] == "alpha-cli-1.0.0-windows-x64.zip",
+         f"scelto l'artefatto sbagliato: {scelto and scelto['name']}")
+
+    # E il giro completo: la tabella, il feed e gli archivi sul disco (qui solo il
+    # pacchetto portabile, che e' quello che c'e' davvero).
+    table = {"alpha": {"cli": str(mine)}}
+    feed_portabile = {"apps": {"alpha": {"repo": "storytold/alpha", "version": "1.0.0",
+                                        "assets": [dict(asset(alpha))]}}}
+    righe = FEED.rows(table, feed_portabile,
+                      {"alpha": {"version": "1.0.0", "source": "prova"}},
+                      archive_dirs=[archives], cli_paths={"alpha": str(mine)},
+                      system="windows", machine="x64")
+    riga = {r["check"]: r for r in righe}.get("byte alpha")
+    want(riga is not None and riga["state"] == "ok", f"la riga dei byte non e' passata dal giro: {riga}")
+    if problems:
+        return "FAIL", "; ".join(problems)[:200]
+    return "PASS", "uguali ok, diversi FIX, archivio manomesso FIX, assente nota, cli_zip preferito"
+
+
 @case("feed assente non e' un guasto", "unit")
 def t_feed_missing(run: Runner) -> tuple[str, str]:
     """Senza launcher non c'e' un termine di paragone, ma il ponte non e' rotto."""
@@ -520,7 +598,7 @@ def t_bad_token(run: Runner) -> tuple[str, str]:
 
 
 ALL = [t_clean, t_stale_install, t_bad_entry, t_broken_path, t_missing_exe,
-       t_feed_compare, t_feed_missing, t_feed_files, t_closed_port,
+       t_feed_compare, t_feed_bytes, t_feed_missing, t_feed_files, t_closed_port,
        t_good_build, t_drift_build, t_wrong_app, t_bad_token]
 
 # Gli strumenti che la suite verifica: le loro impronte finiscono nel report, cosi'

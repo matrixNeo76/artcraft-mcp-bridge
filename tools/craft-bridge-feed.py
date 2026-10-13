@@ -17,19 +17,31 @@ Questo strumento mette le due cose accanto. Non inventa: quello che il feed non 
 resta "non lo so", e quello che il feed non nomina resta "non lo so" invece di
 diventare un guasto.
 
+E c'e' una domanda che la versione non puo' rispondere: **l'eseguibile installato e'
+quello pubblicato?** `--bytes` la risponde confrontando il `<slug>-cli.exe` installato
+con il file omonimo dentro il pacchetto pubblicato, letto in memoria senza estrarre
+niente e senza installare una seconda copia dell'app. Gli archivi si prendono da
+`~/.craft-bridge/releases` o dalla cartella dei download del launcher; `--download
+<slug>` li scarica (impronta del feed verificata **prima** di usarli, file `.parte`
+rimosso se non torna), e i pacchetti veri vanno da 14 a 120 MB: per questo lo
+scaricamento lo chiede un'app alla volta, non lo fa da solo.
+
 Uso:
     python craft-bridge-feed.py                 # installata contro pubblicata
     python craft-bridge-feed.py --packages      # anche i pacchetti pubblicati per questo sistema
     python craft-bridge-feed.py --downloads     # e i byte dei pacchetti gia' scaricati
+    python craft-bridge-feed.py --bytes         # la CLI installata contro quella nel pacchetto
+    python craft-bridge-feed.py --download soundcraft   # scarica quel pacchetto e confronta
     python craft-bridge-feed.py --json
     python craft-bridge-feed.py --feed-dir <cartella>   # feed di prova, o altro disco
 
 Esito:
     0  nessuno scostamento
     1  almeno uno scostamento da segnalare: un'app indietro o avanti rispetto alla
-       pubblicata, oppure un file scaricato che non corrisponde al suo sha256
+       pubblicata, un file scaricato che non corrisponde al suo sha256, oppure la CLI
+       installata che non e' quella dentro il pacchetto pubblicato
     2  errore d'uso
-    3  feed assente o illeggibile
+    3  feed assente o illeggibile, o scaricamento fallito
 
 Nota sui sistemi: la cartella del feed e' nota e verificata su Windows, che e' dove le
 app sono installate su questa macchina. Gli altri percorsi sono quelli **attesi** dal
@@ -46,7 +58,12 @@ import os
 import platform
 import re
 import sys
-from pathlib import Path
+import tarfile
+import time
+import urllib.parse
+import urllib.request
+import zipfile
+from pathlib import Path, PurePosixPath
 
 HERE = Path(__file__).resolve().parent
 
@@ -61,6 +78,23 @@ PACKAGES = {"msi": "installer MSI", "portable_zip": "pacchetto portabile",
             "dmg": "immagine disco", "app_image": "AppImage", "deb": "pacchetto .deb",
             "rpm": "pacchetto .rpm", "flatpak": "Flatpak", "tar_gz": "archivio .tar.gz",
             "cli_zip": "archivio della CLI"}
+
+# Gli unici artefatti che si aprono e si leggono senza strumenti esterni. Un MSI, un
+# .deb, un .dmg o un AppImage restano fuori: dichiararlo e' meglio che fingere di
+# poterli confrontare (e su Windows la CLI non e' pubblicata a parte: sta dentro il
+# pacchetto portabile, quindi per gli altri c'e' solo il pacchetto grande).
+CLI_ARCHIVES = ("cli_zip", "portable_zip", "tar_gz")
+
+# Da dove si scarica: solo questi host, solo https. Il feed li indica, ma il feed e'
+# un file locale che chiunque puo' riscrivere: prima di aprire una connessione si
+# controlla a chi si sta parlando.
+ARCHIVE_HOSTS = ("github.com", "objects.githubusercontent.com",
+                 "release-assets.githubusercontent.com", "codeload.github.com")
+
+# Massimo scaricato per artefatto: i pacchetti veri arrivano a ~120 MB, e un limite
+# dieci volte tanto lascia spazio senza trasformare un errore del feed in un download
+# infinito.
+MAX_DOWNLOAD = 1 << 30
 
 
 def _load(name: str, filename: str):
@@ -281,8 +315,165 @@ def download_rows(feed: dict, downloads_dir: Path) -> list[dict]:
     return rows
 
 
+def cache_dir() -> Path:
+    """Dove questo strumento tiene i pacchetti che scarica per guardarci dentro.
+
+    Non e' la cartella del launcher: quella e' sua e cambia con le sue regole. Qui
+    si accumula solo quello che serve al confronto dei byte, e si puo' cancellare
+    quando si vuole (`--cache-dir` per spostarla).
+    """
+    return Path.home() / ".craft-bridge" / "releases"
+
+
+def cli_name(slug: str) -> str:
+    """Come si chiama la CLI dentro il pacchetto, su questo sistema.
+
+    Su Windows `<slug>-cli.exe` e' quello che c'e' anche installato in
+    `C:\\Program Files` (verificato). Fuori da Windows il nome atteso e' senza
+    estensione: non misurato su questa macchina.
+    """
+    return f"{slug}-cli.exe" if sys.platform == "win32" else f"{slug}-cli"
+
+
+def archive_for(app: dict, system: str | None, machine: str | None) -> dict | None:
+    """L'archivio pubblicato che contiene la CLI per questo sistema, se c'e'.
+
+    Prima l'archivio della sola CLI, poi il pacchetto portabile, poi il tar.gz: il
+    piu' piccolo che risponde alla domanda e' anche il piu' onesto da scaricare.
+    """
+    order = {kind: i for i, kind in enumerate(CLI_ARCHIVES)}
+    found = [asset for asset in artefacts_for(app, system, machine)
+             if str((asset.get("platform") or {}).get("package_type")) in order]
+    if not found:
+        return None
+    return sorted(found, key=lambda a: order[str((a["platform"] or {}).get("package_type"))])[0]
+
+
+def find_archive(asset: dict, dirs: list[Path]) -> Path | None:
+    """Il primo posto in cui quell'archivio c'e' gia': la nostra cache, o il launcher."""
+    name = str(asset.get("name") or "")
+    for folder in dirs:
+        if name and (folder / name).is_file():
+            return folder / name
+    return None
+
+
+def extract_member(archive: Path, wanted: str) -> tuple[str, bytes] | None:
+    """Il file dentro l'archivio il cui nome e' quello cercato (zip o tar.gz).
+
+    Si legge in memoria: non si estrae niente su disco. E' l'unico modo per dire se
+    l'eseguibile installato sono i byte pubblicati, senza installare una seconda copia
+    dell'app.
+    """
+    name = archive.name.lower()
+    try:
+        if name.endswith(".zip"):
+            with zipfile.ZipFile(archive) as bundle:
+                for member in bundle.namelist():
+                    if PurePosixPath(member).name.lower() == wanted.lower():
+                        return member, bundle.read(member)
+        elif name.endswith((".tar.gz", ".tgz")):
+            with tarfile.open(archive) as bundle:
+                for member in bundle.getmembers():
+                    if member.isfile() and PurePosixPath(member.name).name.lower() == wanted.lower():
+                        handle = bundle.extractfile(member)
+                        if handle is not None:
+                            return member.name, handle.read()
+    except (OSError, zipfile.BadZipFile, tarfile.TarError):
+        return None
+    return None
+
+
+def compare_cli_bytes(archive: Path, asset: dict, slug: str, installed: Path) -> dict:
+    """La CLI installata sono i byte pubblicati?
+
+    Tre domande in fila, e ognuna puo' fermare le altre: l'archivio e' quello
+    pubblicato (sha256 del feed)? la CLI installata c'e'? il file dentro l'archivio e'
+    identico a quello installato? L'ultima e' la sola che risponde "questa e' la
+    release" invece di "dichiara di esserla".
+    """
+    row = {"check": f"byte {slug}", "kind": "bytes", "state": "ok", "action": ""}
+    published = str(asset.get("sha256") or "").lower()
+    if not published:
+        row.update(state="nota", kind="unknown",
+                   detail=f"il feed non pubblica un'impronta per {archive.name}")
+        return row
+    actual = sha256_file(archive)
+    if actual.lower() != published:
+        row.update(state="fail", kind="hash",
+                   detail=f"{archive.name} non e' quello pubblicato: {actual[:12]}... != "
+                          f"{published[:12]}...",
+                   action="cancella l'archivio e riscaricalo")
+        return row
+    if not installed.is_file():
+        row.update(state="nota", kind="unknown",
+                   detail=f"la CLI installata non c'e': {installed}")
+        return row
+    found = extract_member(archive, installed.name)
+    if found is None:
+        row.update(state="nota", kind="unknown",
+                   detail=f"{installed.name} non c'e' dentro {archive.name}")
+        return row
+    member, published_bytes = found
+    mine, theirs = sha256_file(installed), hashlib.sha256(published_bytes).hexdigest()
+    if mine.lower() == theirs.lower():
+        row.update(detail=f"{installed.name} e' {member} dentro {archive.name}, byte per byte "
+                          f"(sha256 {mine[:12]}...)")
+        return row
+    row.update(state="fail", kind="bytes",
+               detail=f"{installed.name} {mine[:12]}... != {member} dentro {archive.name} "
+                      f"{theirs[:12]}... ({len(published_bytes)} byte pubblicati, "
+                      f"{installed.stat().st_size} installati)",
+               action="l'eseguibile installato non e' quello pubblicato: reinstalla l'app "
+                      "dal launcher, o indaga su quella copia")
+    return row
+
+
+def download_asset(asset: dict, into: Path) -> Path:
+    """Scarica un artefatto pubblicato e ne verifica l'impronta prima di usarlo.
+
+    Si scrive su un file `.parte` e si rinomina solo a impronta verificata: un
+    download interrotto non lascia in giro un archivio che sembra buono. Se l'impronta
+    non torna il file viene cancellato e si solleva `FeedError`, cosi' l'errore arriva
+    a chi ha chiesto il download invece di diventare un verdetto sui byte.
+    """
+    url = str(asset.get("download_url") or "")
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme != "https" or parsed.hostname not in ARCHIVE_HOSTS:
+        raise FeedError(f"indirizzo non accettato per il download: {url or '(assente)'}")
+    name, expected = str(asset.get("name") or "artefatto"), str(asset.get("sha256") or "").lower()
+    into.mkdir(parents=True, exist_ok=True)
+    target, partial = into / name, into / (name + ".parte")
+    started = time.time()
+    print(f"  scarico {name} ({int(asset.get('size_bytes') or 0) / 1e6:.1f} MB)...",
+          file=sys.stderr)
+    digest = hashlib.sha256()
+    written = 0
+    try:
+        with urllib.request.urlopen(url, timeout=120) as reply, partial.open("wb") as handle:
+            while chunk := reply.read(1 << 20):
+                written += len(chunk)
+                if written > MAX_DOWNLOAD:
+                    raise FeedError(f"{name} supera il limite di scaricamento")
+                digest.update(chunk)
+                handle.write(chunk)
+    except (OSError, urllib.error.URLError) as exc:
+        partial.unlink(missing_ok=True)
+        raise FeedError(f"scaricamento fallito ({name}): {exc}")
+    if expected and digest.hexdigest() != expected:
+        partial.unlink(missing_ok=True)
+        raise FeedError(f"{name} non corrisponde all'impronta pubblicata: "
+                        f"{digest.hexdigest()[:12]}... != {expected[:12]}...")
+    partial.replace(target)
+    print(f"  {name}: {written / 1e6:.1f} MB in {time.time() - started:.0f} s, impronta "
+          f"verificata", file=sys.stderr)
+    return target
+
+
 def rows(table: dict, feed: dict, installed: dict, *,
          downloads_dir: Path | None = None, packages: bool = False,
+         archive_dirs: list[Path] | None = None, cli_paths: dict | None = None,
+         only: set[str] | None = None,
          system: str | None = None, machine: str | None = None) -> list[dict]:
     """Il confronto app per app. Funzione pura: nessuna porta, nessun file, nessuna app.
 
@@ -346,6 +537,30 @@ def rows(table: dict, feed: dict, installed: dict, *,
                     "action": "riapri il launcher: una delle due e' vecchia"})
     if downloads_dir is not None:
         out += download_rows(feed, downloads_dir)
+    if archive_dirs is not None:
+        for slug in sorted(table):
+            if only and slug not in only:
+                continue
+            app = feed["apps"].get(slug)
+            if app is None:
+                continue
+            asset = archive_for(app, system, machine)
+            cli = (cli_paths or {}).get(slug) or table[slug].get("cli")
+            if asset is None:
+                out.append({"check": f"byte {slug}", "kind": "unknown", "state": "nota",
+                            "detail": "nessun archivio leggibile per "
+                                      f"{system or '?'}/{machine or '?'}: la CLI sta in un "
+                                      "contenitore che non si apre senza strumenti esterni",
+                            "action": ""})
+                continue
+            found = find_archive(asset, archive_dirs)
+            if found is None:
+                size = int(asset.get("size_bytes") or 0) / 1e6
+                out.append({"check": f"byte {slug}", "kind": "unknown", "state": "nota",
+                            "detail": f"{asset.get('name')} non e' sul disco ({size:.1f} MB)",
+                            "action": f"python craft-bridge-feed.py --download {slug}"})
+                continue
+            out.append(compare_cli_bytes(found, asset, slug, Path(str(cli))))
     return out
 
 
@@ -380,6 +595,14 @@ def main() -> int:
     parser.add_argument("--downloads-dir",
                         help="cartella dei pacchetti scaricati (default: <feed>/"
                              + DOWNLOADS_DIR + ")")
+    parser.add_argument("--bytes", action="store_true",
+                        help="confronta la CLI installata con quella dentro il pacchetto "
+                             "pubblicato: gli archivi gia' sul disco, nessuno scaricamento")
+    parser.add_argument("--download", action="append", default=[], metavar="SLUG",
+                        help="scarica il pacchetto di quell'app (impronta verificata) e ne "
+                             "confronta i byte; ripetibile")
+    parser.add_argument("--cache-dir", default=str(cache_dir()),
+                        help="dove tenere i pacchetti scaricati (default: ~/.craft-bridge/releases)")
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--out", help="scrivi il report JSON anche su file")
     args = parser.parse_args()
@@ -404,9 +627,41 @@ def main() -> int:
         downloads = Path(args.downloads_dir) if args.downloads_dir \
             else feed_dir / DOWNLOADS_DIR
     system, machine = this_platform()
+
+    archive_dirs = [Path(args.cache_dir)]
+    if downloads is not None:
+        archive_dirs.append(downloads)
+    elif (feed_dir / DOWNLOADS_DIR).is_dir():
+        archive_dirs.append(feed_dir / DOWNLOADS_DIR)
+    wanted = {str(s) for s in args.download}
+    if wanted:
+        unknown = sorted(wanted - set(table))
+        if unknown:
+            print(f"app fuori dalla tabella: {', '.join(unknown)}", file=sys.stderr)
+            return 2
+        for slug in sorted(wanted):
+            asset = archive_for(feed["apps"].get(slug) or {}, system, machine)
+            if asset is None:
+                print(f"{slug}: nessun archivio pubblicato che si possa aprire per "
+                      f"{system or '?'}/{machine or '?'}", file=sys.stderr)
+                continue
+            already = find_archive(asset, archive_dirs)
+            if already is not None:
+                print(f"  {slug}: {asset['name']} e' gia' in {already.parent}", file=sys.stderr)
+                continue
+            try:
+                download_asset(asset, Path(args.cache_dir))
+            except FeedError as exc:
+                print(f"  {slug}: {exc}", file=sys.stderr)
+                return 3
+
+    want_bytes = args.bytes or bool(wanted)
     try:
         results = rows(table, feed, installed_versions(table), downloads_dir=downloads,
-                       packages=args.packages, system=system, machine=machine)
+                       packages=args.packages, system=system, machine=machine,
+                       archive_dirs=archive_dirs if want_bytes else None,
+                       only=(None if args.bytes or not wanted else wanted),
+                       cli_paths={slug: spec["cli"] for slug, spec in table.items()})
     except OSError as exc:
         print(f"lettura fallita: {exc}", file=sys.stderr)
         return 3
