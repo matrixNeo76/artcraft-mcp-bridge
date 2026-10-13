@@ -35,9 +35,9 @@ doing next, in order of value for cost.
       signals and `start_new_session`.
 - [ ] **Installable package**: `pyproject.toml` with entry points (`craft-bridge doctor`,
       `… tests`) so the tools are used without the `tools/` prefix.
-- [ ] **CI**: GitHub Actions on Windows running `--static` on every push (the cases with real
-      apps stay local, they need the installed executables). *Partly done: the workflow exists and
-      the self-hosted job runs the whole suite.*
+- [x] **CI**: GitHub Actions on Windows running `--static` on every push, and the whole suite -
+      the cases with real apps - on the self-hosted runner, on every push to `main`. The procedure
+      is in [docs/operations/ci.md](docs/operations/ci.md).
 - [ ] **Unit tests of the protocol**: JSON-lines parsing, end of message, timeouts, network error
       handling — today covered only end-to-end.
 - [ ] **Integrity beyond the version**: hash of the executable recorded in `builds.json`, to tell

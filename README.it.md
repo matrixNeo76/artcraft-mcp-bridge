@@ -108,8 +108,11 @@ A ogni push su `main` (e su ogni pull request) gira
 [checks.yml](.github/workflows/checks.yml): sintassi degli strumenti, interfacce, coerenza della
 tabella delle app con le porte documentate, determinismo dell'installer, conformità del bundle OKF
 e la suite con `--ci` — che su un runner senza app salta i casi d'ambiente **motivandoli**, mentre
-un guasto vero resta un FAIL. La suite intera gira su un runner self-hosted con le app installate
-(`CRAFTBRIDGE_SELF_HOSTED=1`). Dettagli in [docs/operations/ci.md](docs/operations/ci.md).
+un guasto vero resta un FAIL. La suite intera gira su un runner self-hosted dove il ponte è installato (variabile di repo
+`CRAFTBRIDGE_SELF_HOSTED=1`): è attiva sui push in `main` e sugli avvii manuali, mai sulle pull
+request — il repository è pubblico, e il codice di uno sconosciuto non gira sulla macchina che
+ha le app.
+Dettagli in [docs/operations/ci.md](docs/operations/ci.md).
 
 ## Limiti dichiarati
 

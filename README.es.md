@@ -110,7 +110,10 @@ En cada push a `main` (y en cada pull request) se ejecuta
 la tabla de aplicaciones con los puertos documentados, determinismo del instalador, conformidad del
 bundle OKF y la suite con `--ci` — que en un runner sin aplicaciones omite los casos de entorno
 **explicando por qué**, mientras que un fallo real sigue siendo un FAIL. La suite completa se
-ejecuta en un runner self-hosted con las aplicaciones instaladas (`CRAFTBRIDGE_SELF_HOSTED=1`).
+ejecuta en un runner self-hosted donde el puente está instalado (variable de repo
+`CRAFTBRIDGE_SELF_HOSTED=1`): está activa en los push a `main` y en las ejecuciones manuales,
+nunca en las pull requests — el repositorio es público, y el código de un desconocido no se
+ejecuta en la máquina que tiene las aplicaciones.
 Detalles en [docs/operations/ci.md](docs/operations/ci.md).
 
 ## Límites declarados

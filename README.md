@@ -107,8 +107,11 @@ On every push to `main` (and on every pull request) [checks.yml](.github/workflo
 runs: syntax of the tools, interfaces, consistency of the app table with the documented ports,
 determinism of the installer, conformance of the OKF bundle and the suite with `--ci` — which on a
 runner without apps skips the environment cases **with the reason**, while a real fault stays a
-FAIL. The whole suite runs on a self-hosted runner with the apps installed
-(`CRAFTBRIDGE_SELF_HOSTED=1`). Details in [docs/operations/ci.md](docs/operations/ci.md).
+FAIL. The whole suite runs on a self-hosted runner where the bridge is installed (repository variable
+`CRAFTBRIDGE_SELF_HOSTED=1`): it is active on pushes to `main` and on manual runs, never on pull
+requests — the repository is public, and a stranger's code does not run on the machine that has
+the apps.
+Details in [docs/operations/ci.md](docs/operations/ci.md).
 
 ## Declared limits
 

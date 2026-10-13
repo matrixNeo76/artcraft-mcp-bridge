@@ -30,9 +30,74 @@ So the workflow has two jobs:
 | `ponte-completo` | a **self-hosted** runner with the apps | `doctor` and the whole suite, where the bridge really exists |
 
 The second one is enabled by setting the repository variable `CRAFTBRIDGE_SELF_HOSTED=1`
-(Settings → Secrets and variables → Actions → Variables) and registering a runner with the
-labels `self-hosted`, `windows`, `craftbridge`. If the variable is absent, the job is
-skipped and does not colour the badge.
+(Settings → Secrets and variables → Actions → Variables) **and** by having a runner with the
+labels `self-hosted`, `windows`, `craftbridge` registered and online. If either of the two is
+missing the job is skipped and does not colour the badge: the next section is that switch, piece
+by piece.
+
+# The self-hosted runner, piece by piece
+
+The `ponte-completo` job runs where the bridge really exists. What is activated and where it
+lives:
+
+| Piece | Where / value |
+|---|---|
+| Repository variable | `CRAFTBRIDGE_SELF_HOSTED=1` (`gh variable set CRAFTBRIDGE_SELF_HOSTED --body 1`) |
+| Runner | `craftbridge-auresystem`, version 2.338.0, in `C:\Users\auresystem\actions-runner-craftbridge` |
+| Labels | `self-hosted`, `windows`, `craftbridge` (they must match the job's `runs-on`) |
+| Starts at logon | `%APPDATA%\...\Startup\craftbridge-actions-runner.cmd` → `start-runner.cmd` → `run.cmd` |
+| Log | `C:\Users\auresystem\actions-runner-craftbridge\runner.log` |
+| Online check | `gh api repos/<owner>/<repo>/actions/runners` → `"status": "online"` |
+
+Prerequisites on the machine: `python` 3.12 in the PATH and the bridge installed
+(`python tools/craft-bridge-config.py --apply`), because the diagnosis looks at what is
+actually running. PowerShell 7 is **not** required: the hosted job uses `pwsh`, which GitHub
+runners have and a normal PC may not, so this job's steps use `powershell`, which every Windows
+has. The first real run failed exactly there (`pwsh: command not found`) - a machine teaching the
+pipeline what "portable" means.
+
+Setting it up from scratch:
+
+```bash
+# 1. tell the workflow that the machine exists
+gh variable set CRAFTBRIDGE_SELF_HOSTED --body 1
+
+# 2. official runner, latest release
+VER=$(gh api repos/actions/runner/releases/latest -q .tag_name | sed 's/^v//')
+curl -sSL -o runner.zip \
+  "https://github.com/actions/runner/releases/download/v$VER/actions-runner-win-x64-$VER.zip"
+powershell -NoProfile -Command "Expand-Archive runner.zip -DestinationPath . -Force"
+
+# 3. register it with the labels the job asks for
+TOKEN=$(gh api -X POST repos/<owner>/<repo>/actions/runners/registration-token -q .token)
+bin/Runner.Listener.exe configure --url https://github.com/<owner>/<repo> \
+  --token "$TOKEN" --name craftbridge-auresystem \
+  --labels self-hosted,windows,craftbridge --work _work --unattended --replace
+
+# 4. start it (and once to prove the same path works)
+powershell -NoProfile -Command "Start-Process -FilePath '<dir>\start-runner.cmd' -WindowStyle Minimized"
+```
+
+**Why not a Windows service.** The suite starts the Crafting Apps and drives their windows, and a
+service runs in session 0, where those windows do not exist: the runner would be online and unable
+to prove anything. The Startup folder starts it inside the user's session, which is exactly where
+the bridge exists. A scheduled task "at logon" would do the same but needs administrator rights.
+
+**Why it never runs on pull requests.** This repository is public: a pull request, including one
+from a fork, would run a stranger's code on the machine where the bridge is installed, and that is
+not a disposable machine. The job's condition therefore accepts only `push` and
+`workflow_dispatch`; the hosted job stays active on pull requests, where there is nothing to ruin.
+
+**Removing it:**
+
+```bash
+bin/Runner.Listener.exe remove --token $(gh api -X POST \
+  repos/<owner>/<repo>/actions/runners/remove-token -q .token)
+gh variable delete CRAFTBRIDGE_SELF_HOSTED     # the job goes back to being skipped
+```
+
+then delete the runner folder and the Startup entry. The two together are the switch: the variable
+alone, or the runner alone, changes nothing.
 
 # The steps of the hosted job
 

@@ -99,7 +99,8 @@ uvx okfgen visualize docs -o reports/okf-graph.html    # 生成该包的可交�
 每次推送到 `main`（以及每个 pull request）都会运行 [checks.yml](.github/workflows/checks.yml)：工具语法、
 接口、应用表格与文档化端口的一致性、安装器的确定性、OKF 包的合规性，以及带 `--ci` 的测试套件——在没有应用的
 runner 上，它会**说明原因**后跳过环境相关用例，而真正的故障仍然是 FAIL。完整套件运行在装有这些应用的
-self-hosted runner 上（`CRAFTBRIDGE_SELF_HOSTED=1`）。详情见
+self-hosted runner 上（仓库变量 `CRAFTBRIDGE_SELF_HOSTED=1`）：它在推送到 `main` 和手动触发时运行，绝不
+在 pull request 上运行——仓库是公开的，陌生人的代码不会在装有这些应用的机器上执行。详情见
 [docs/operations/ci.md](docs/operations/ci.md)。
 
 ## 已声明的限制
