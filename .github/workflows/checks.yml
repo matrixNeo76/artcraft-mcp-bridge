@@ -156,6 +156,11 @@ jobs:
     name: suite completa (runner self-hosted)
     if: ${{ vars.CRAFTBRIDGE_SELF_HOSTED == '1' &&
             (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
+    # Prerequisiti della macchina: `python` (3.12) nel PATH e il ponte installato
+    # (`craft-bridge-config.py --apply`), perche' la diagnosi guarda cio' che gira
+    # davvero. PowerShell 7 **non** serve: `pwsh` c'e' nei runner GitHub e non e'
+    # garantito altrove, quindi qui si usa `powershell`, che ogni Windows ha. E' il
+    # secondo guasto trovato da questo job alla prima esecuzione vera.
     runs-on: [self-hosted, windows, craftbridge]
     timeout-minutes: 30
     steps:
@@ -163,13 +168,13 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Diagnosi della macchina
-        shell: pwsh
+        shell: powershell
         run: |
           python tools/craft-bridge-doctor.py
           if ($LASTEXITCODE -ne 0) { throw "la diagnosi ha trovato problemi: vedi le azioni sopra" }
 
       - name: Suite completa (avvia app vere su porte libere)
-        shell: pwsh
+        shell: powershell
         run: |
           python tools/craft-bridge-tests.py
           if ($LASTEXITCODE -ne 0) { throw "la suite ha trovato un guasto" }
