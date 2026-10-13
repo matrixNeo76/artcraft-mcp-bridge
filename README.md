@@ -2,116 +2,126 @@
 
 [![checks](https://github.com/matrixNeo76/artcraft-mcp-bridge/actions/workflows/checks.yml/badge.svg)](https://github.com/matrixNeo76/artcraft-mcp-bridge/actions/workflows/checks.yml)
 
-Ponte fra le **Crafting Apps** (CADCraft, DeckCraft, DesignCraft, FilmCraft, GridCraft,
-LightCraft, PhotoCraft, SoundCraft, VectorCraft, WordCraft, EffectCraft) e i client MCP:
-invece di ripiegare sulla CLI senza interfaccia, l'app viva viene guidata nel suo
-**canale di controllo**, così i tool agiscono sulla finestra aperta.
+**English** · [Italiano](README.it.md) · [Español](README.es.md) · [中文](README.zh.md)
 
-## Il problema
+A bridge between the **Crafting Apps** (CADCraft, DeckCraft, DesignCraft, FilmCraft, GridCraft,
+LightCraft, PdfCraft, PhotoCraft, SoundCraft, VectorCraft, WordCraft, EffectCraft) and MCP
+clients: instead of falling back to the interface-less CLI, the running app is driven through its
+**control channel**, so the tools act on the open window.
 
-Ogni Crafting App espone un server MCP headless (`<app>-cli.exe mcp`). Molti tool però
-hanno senso solo sull'app viva: disegnare, fotografare la tela, muovere un cursore. In
-headless quei tool spariscono o falliscono, e il client non può sapere perché.
+## The problem
 
-## Come funziona
+Every Crafting App exposes a headless MCP server (`<app>-cli.exe mcp`). Many tools, though, only
+make sense on the live app: drawing, capturing the canvas, moving a cursor. In headless those
+tools disappear or fail, and the client cannot know why.
 
-1. l'app viene avviata con `--control <porta>` (e, per PhotoCraft, `--control-token-file`);
-2. lo **shim** registrato nei connettori fa un **handshake** su quella porta;
-3. se il peer parla il protocollo **ed è l'app giusta** (catalogo dei comandi, soglia
-   0,9) va in **bridged** e inoltra le richieste all'app; altrimenti va in **headless**
-   e lo dichiara su stderr. Con `--require-bridge` esce 3 invece di ripiegare.
+## How it works
 
-Nessun ripiego silenzioso: il modo scelto è sempre dichiarato, e chi risponde sulla
-porta è identificato (app **e** build in esecuzione).
+1. the app is started with `--control <port>` (and, for PhotoCraft, `--control-token-file`);
+2. the **shim** registered in the connectors performs a **handshake** on that port;
+3. if the peer speaks the protocol **and is the right app** (command catalogue, threshold 0.9) it
+   goes **bridged** and forwards the requests to the app; otherwise it goes **headless** and says
+   so on stderr. With `--require-bridge` it exits 3 instead of falling back.
 
-## Struttura
+PdfCraft is the exception to point 3: it uses a *control file* and its MCP server has no bridge
+flag (`mcp --connect` → `unknown option`). Its window is driven all the same, by
+**translation**: [craft-bridge-ui.py](tools/craft-bridge-ui.py) exposes the 15 methods the app
+declares as as many MCP tools, invoking `pdfcraft-cli ui --control FILE <method>` once per call.
+
+No silent fallback: the mode chosen is always declared, and whoever answers on the port is
+identified (the app **and** the running build). The same holds for the table: the attach flag each
+app requires is not something we remember — we ask the CLI help, and when it does not confirm it
+the diagnosis says so.
+
+## Layout
 
 ```
-tools/     gli strumenti (Python): shim, ident, doctor, config, launch, verify, sweep, tests, esplorativi
-install/   install-craft-mcp.ps1 (registrazione multi-client dell'MCP generativo)
-reports/   artefatti generati: report della suite, dello sweep, inventario tool, immagini
-docs/      documentazione in formato OKF v0.2 (nodi e relazioni) - vedi docs/index.md
+tools/     the tools (Python): shim, window translator, ident, doctor, config, launch, verify, sweep, tests, exploratory
+install/   install-craft-mcp.ps1 (multi-client registration of the generative MCP)
+reports/   generated artifacts: suite and sweep reports, tool inventory, images
+docs/      documentation in OKF v0.2 format (nodes and relations) - see docs/index.md
 ```
 
-## Avvio rapido
+## Quick start
 
 ```bash
-# 1. installa le copie dello shim e riscrive le entry dei connettori (con backup)
+# 1. installs the copies of the shim and rewrites the connector entries (with a backup)
 python tools/craft-bridge-config.py --apply
 # 2. in Freebuff: Connectors -> Refresh
 
-# 3. avvia le app col canale di controllo (le finestre restano aperte)
+# 3. start the apps with the control channel (the windows stay open)
 python tools/craft-bridge-launch.py
 
-# 4. verifica: un verdetto sull'assieme, poi ogni entry col suo comando reale
+# 4. verify: one verdict on the assembly, then every entry with its real command
 python tools/craft-bridge-doctor.py
 python tools/craft-bridge-verify.py
 ```
 
-Ripristino headless: `python tools/craft-bridge-config.py --restore`.
+Back to headless: `python tools/craft-bridge-config.py --restore`.
 
-## Stato verificato (13 ottobre 2026)
+## Verified state (13 October 2026)
 
-| Prova | Esito |
+| Proof | Outcome |
 |---|---|
-| App guidabili in bridged, con una chiamata riuscita sulla finestra | 11 su 12 (PdfCraft: MCP senza ponte) |
-| Entry della config eseguite col comando reale | 13/13 |
-| Suite di guasti (14 casi, guasti iniettati) | 14/14, due giri di fila identici |
-| Installata contro la release pubblicata dal launcher | 11 su 11 allineate (feed del 13 ottobre) |
-| Byte della CLI installata contro quelli pubblicati | 1 su 11 provata: SoundCraft identico (`sha256 915ee3abb121…`); per le altre l'archivio non è sul disco |
-| Inventario tool dei server | 13/13 server, 764 tool |
-| Diagnosi complessiva | `tutto in ordine` |
+| Apps driveable with a successful call on the window | 12 of 12 (11 bridged through the shim, PdfCraft by translation) |
+| Config entries run with the real command | 13/13 |
+| Fault suite (23 cases, injected faults) | 23/23, two runs in a row identical |
+| Installed against the release published by the launcher | 12 of 12 aligned (feed of 13 October) |
+| Bytes of the installed CLI against the published ones | 1 of 11 tried: SoundCraft identical (`sha256 915ee3abb121…`); for the others the archive is not on disk |
+| App and CLI paths | 11 of 11 from the `App Paths` registry (the table confirms, it does not decide) |
+| PdfCraft window methods | 15 of 15 as the app declares them; 192 commands, 107 widgets, screenshot of the window |
+| Attach flags declared by the table | 12 of 12 confirmed by the CLI help (11 `--connect`/`--bridge` attaches, PdfCraft with no flag and with `--control`) |
+| Tool inventory of the servers | 13/13 servers, 618 tools (`pdfcraft`: the 15 window methods) |
+| Overall diagnosis | `tutto in ordine` |
 
-## Documentazione
+## Documentation
 
-La documentazione vive in [docs/index.md](docs/index.md): è un bundle **OKF v0.2**, un
-nodo per concetto con relazioni esplicite fra i nodi (architettura, strumenti,
-operazioni, difetti trovati). Il testo lungo e completo, con tutte le misure, è
+The documentation lives in [docs/index.md](docs/index.md): it is an **OKF v0.2** bundle, one node
+per concept with explicit relations between the nodes (architecture, tools, operations, defects
+found). The long, complete text, with every measurement, is
 [docs/reference/craft-bridge.md](docs/reference/craft-bridge.md).
 
 ```bash
-uvx okfgen validate docs --strict                      # conforme: 30 concetti, 0 errori
-uvx okfgen visualize docs -o reports/okf-graph.html    # grafo interattivo del bundle
+uvx okfgen validate docs --strict                      # conformant: 32 concepts, 0 errors
+uvx okfgen visualize docs -o reports/okf-graph.html    # interactive graph of the bundle
 ```
 
-Il grafo generato è in [reports/okf-graph.html](reports/okf-graph.html): 30 nodi, 123 relazioni.
+The generated graph is in [reports/okf-graph.html](reports/okf-graph.html): 32 nodes, 162 relations.
 
-## Cos'e' installato, contro cosa e' pubblicato
+## What is installed, against what is published
 
-La versione di un eseguibile dice cosa dichiara di essere, non se e' la release che il
-fornitore distribuisce. Il launcher di ArtCraft tiene sul disco l'elenco che usa per
-aggiornare le app (repository, ultima release, pacchetti con il loro `sha256`):
-[craft-bridge-feed.py](tools/craft-bridge-feed.py) mette quell'elenco accanto alla build
-installata e dice dove le due cose non coincidono. E con `--bytes` fa l'unica domanda che
-la versione non può rispondere: confronta l'eseguibile installato con quello **dentro**
-il pacchetto pubblicato, letto in memoria senza estrarre niente — `--download <slug>`
-prende il pacchetto (impronta del feed verificata prima di usarlo, un'app alla volta,
-solo dagli host del feed). Dentro `doctor` una versione indietro è una `nota`, non un
-`FIX`: il ponte funziona anche con la release precedente. Dettagli in
+The version of an executable says what it claims to be, not whether it is the release the vendor
+distributes. The ArtCraft launcher keeps on disk the list it uses to update the apps (repository,
+latest release, packages with their `sha256`):
+[craft-bridge-feed.py](tools/craft-bridge-feed.py) puts that list beside the installed build and
+says where the two do not match. And with `--bytes` it asks the one question the version cannot
+answer: it compares the installed executable with the one **inside** the published package, read
+in memory without extracting anything — `--download <slug>` fetches the package (feed digest
+verified before use, one app at a time, only from the feed hosts). Inside `doctor` a version
+behind is a `nota`, not a `FIX`: the bridge works with the previous release too. Details in
 [docs/tools/craft-bridge-feed.md](docs/tools/craft-bridge-feed.md).
 
-## Controlli automatici
+## Automated checks
 
-A ogni push su `main` (e su ogni pull request) gira
-[checks.yml](.github/workflows/checks.yml): sintassi degli strumenti, interfacce,
-coerenza della tabella delle app con le porte documentate, determinismo dell'installer,
-conformità del bundle OKF e la suite con `--ci` — che su un runner senza app salta i casi
-d'ambiente **motivandoli**, mentre un guasto vero resta un FAIL. La suite intera gira su un
-runner self-hosted con le app installate (`CRAFTBRIDGE_SELF_HOSTED=1`). Dettagli in
-[docs/operations/ci.md](docs/operations/ci.md).
+On every push to `main` (and on every pull request) [checks.yml](.github/workflows/checks.yml)
+runs: syntax of the tools, interfaces, consistency of the app table with the documented ports,
+determinism of the installer, conformance of the OKF bundle and the suite with `--ci` — which on a
+runner without apps skips the environment cases **with the reason**, while a real fault stays a
+FAIL. The whole suite runs on a self-hosted runner with the apps installed
+(`CRAFTBRIDGE_SELF_HOSTED=1`). Details in [docs/operations/ci.md](docs/operations/ci.md).
 
-## Limiti dichiarati
+## Declared limits
 
-- **Windows**: la suite e il launcher usano `taskkill` e `DETACHED_PROCESS`.
-- La cattura della finestra richiede la finestra visibile; un'app in background può
-  restituire un timeout che sembra un guasto del ponte e non lo è.
-- La versione dell'eseguibile non è il suo contenuto: due build con la stessa versione
-  e senza revisione nella riga di avvio sono indistinguibili (nessun hash del binario).
-- L'uso reale da parte di un agente dentro Freebuff, attraverso l'interfaccia, non è
-  stato osservato: le prove parlano ai binari via protocollo.
+- **Windows only**: the suite and the launcher use `taskkill` and `DETACHED_PROCESS`.
+- Window capture requires the window to be visible; an app in the background may return a timeout
+  that looks like a bridge fault and is not.
+- The version of the executable is not its content: two builds with the same version and no
+  revision in the startup line are indistinguishable (no hash of the binary).
+- The real use by an agent inside Freebuff, through the interface, has not been observed: the
+  proofs talk to the binaries over the protocol.
 
-## Licenza
+## Licence
 
-**MIT** — il testo completo è in [LICENSE](LICENSE): uso, modifica e ridistribuzione
-liberi, anche dentro prodotti chiusi, purché l'avviso di copyright e la licenza restino
-insieme al software. Il software è fornito così com'è, senza garanzie.
+**MIT** — the full text is in [LICENSE](LICENSE): free use, modification and redistribution, even
+inside closed products, as long as the copyright notice and the licence stay with the software.
+The software is provided as is, without warranty.
