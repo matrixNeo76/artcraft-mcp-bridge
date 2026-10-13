@@ -7,19 +7,30 @@ Serve a documentare con prove, e non a indovinare, i flag esatti di ogni app:
 quale desktop app espone `--control`, quale CLI sa fare da bridge, e da dove
 arriva il `control-token`.
 
+Dove sta l'app lo dice il **sistema**: per ogni slug si chiede allo shim, cioe' alla
+stessa funzione che legge la registrazione `App Paths` con cui il ponte trova la CLI
+da collegare e l'eseguibile da avviare. `--root` resta il ripiego per le app che il
+sistema non registra (e per un sistema che non ha il registro).
+
 Uso:
     python craft-bridge-recon.py --matrix          # chi espone cosa (veloce)
     python craft-bridge-recon.py --app photocraft  # contesti su un'app
     python craft-bridge-recon.py --all-context     # contesti su tutte
     python craft-bridge-recon.py --json            # matrice + contesti in JSON
     python craft-bridge-recon.py --needle "control-token"
+    python craft-bridge-recon.py --app gridcraft --root "D:/Apps"    # ripiego esplicito
 """
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import sys
 from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+SHIM = HERE / "craft-bridge-mcp.py"
+DEFAULT_ROOT = r"C:\Program Files"
 
 APPS = {
     "cadcraft": "CADCraft",
@@ -56,6 +67,34 @@ DEFAULT_NEEDLES = (
 CHUNK = 4 * 1024 * 1024
 OVERLAP = 512
 CONTEXT = 200
+
+
+_SHIM = None
+
+
+def shim():
+    """Lo shim caricato come modulo: la domanda sul registro si fa in un posto solo."""
+    global _SHIM
+    if _SHIM is None:
+        spec = importlib.util.spec_from_file_location("craft_bridge_mcp_recon", SHIM)
+        if spec is None or spec.loader is None:
+            raise SystemExit(f"shim non caricabile: {SHIM}")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        _SHIM = module
+    return _SHIM
+
+
+def registered_dir(slug: str) -> Path | None:
+    """La cartella dell'app secondo **il sistema**.
+
+    `registered_exe` e' la stessa funzione con cui il ponte trova la CLI da collegare:
+    una sola implementazione del registro, e un'app che si sposta non lascia qui un
+    percorso vecchio. `None` quando il sistema non la registra (o il registro non
+    esiste): allora vale `--root`.
+    """
+    exe, _hive = shim().registered_exe(slug)
+    return Path(str(exe)).parent if exe else None
 
 
 def printable(raw: bytes) -> str:
@@ -98,7 +137,9 @@ def scan(path: Path, needles: list[bytes], max_hits: int):
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--root", default=r"C:\Program Files")
+    parser.add_argument("--root", default=None,
+                        help="dove cercare le app che il sistema non registra "
+                             f"(default: {DEFAULT_ROOT})")
     parser.add_argument("--app", help="slug di una sola app")
     parser.add_argument("--matrix", action="store_true", help="solo presenza dei needle")
     parser.add_argument("--all-context", action="store_true")
@@ -108,7 +149,7 @@ def main() -> int:
     args = parser.parse_args()
 
     needles = [n.encode() for n in args.needle] if args.needle else list(DEFAULT_NEEDLES)
-    root = Path(args.root)
+    root = Path(args.root or DEFAULT_ROOT)
 
     slugs = [args.app] if args.app else sorted(APPS)
     report: dict[str, dict] = {}
@@ -117,7 +158,7 @@ def main() -> int:
         if not folder:
             print(f"slug sconosciuto: {slug}", file=sys.stderr)
             return 2
-        app_dir = root / folder
+        app_dir = registered_dir(slug) or (root / folder)
         entry = {}
         for kind, name in (("cli", f"{slug}-cli.exe"), ("app", f"{slug}.exe")):
             path = app_dir / name

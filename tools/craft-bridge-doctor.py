@@ -6,11 +6,13 @@ suo strumento: lo shim installato deve essere quello del repo (altrimenti i clie
 eseguono codice vecchio), le entry di `~/.agents/mcp.json` devono essere quelle che
 l'installer scriverebbe (altrimenti un'app resta headless senza che nessuno lo dica),
 gli eseguibili devono esserci, e quello che *gira* sulla porta deve essere la build
-configurata (il catalogo identifica l'app, non la versione). A questi si aggiunge un
-confronto che non e' un guasto ma una informazione: quello che il launcher di ArtCraft
-**pubblica** per ogni app, contro quello che risulta installato (dal feed del launcher,
-letto da `craft-bridge-feed.py`). Questo comando li interroga tutti e risponde in fondo
-con una riga sola:
+configurata (il catalogo identifica l'app, non la versione). Due controlli in piu' non
+nascondono guasti ma li prevengono: **dove sta l'app** lo dice il sistema (`App Paths`,
+scritto dall'installer) e la tabella scritta a mano lo conferma, cosi' un percorso
+cablato che invecchia non passa in silenzio; e quello che il launcher di ArtCraft
+**pubblica** viene confrontato con quello che risulta installato (feed letto da
+`craft-bridge-feed.py`). Questo comando li interroga tutti e risponde in fondo con una
+riga sola:
 
     VERDETTO: tutto in ordine (nessuna azione)
 
@@ -44,6 +46,7 @@ import argparse
 import hashlib
 import importlib.util
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -62,6 +65,9 @@ def _load(name: str, filename: str):
 
 IDENT = _load("craft_bridge_ident", "craft-bridge-ident.py")
 CONFIG = _load("craft_bridge_config", "craft-bridge-config.py")
+# La tabella delle app e il flag di aggancio stanno nello shim: qui si chiede a lui,
+# invece di tenere una seconda copia di quello che serve per guidare una finestra.
+SHIM = _load("craft_bridge_mcp", "craft-bridge-mcp.py")
 # Il confronto con la release pubblicata e' un'informazione in piu': se lo strumento
 # che la legge non c'e', la diagnosi lo dice e continua, invece di morire.
 try:
@@ -72,10 +78,12 @@ except SystemExit as exc:
 
 # Cosa deve esserci nel repo perche' l'assieme funzioni.
 REQUIRED = ("craft-bridge-mcp.py", "craft-bridge-ident.py", "craft-bridge-config.py",
-            "craft-bridge-feed.py")
+            "craft-bridge-feed.py", "craft-bridge-ui.py")
 # Cosa deve esserci **installato** accanto allo shim: lo shim delega a ident la
 # domanda sulla build, quindi senza quel file il controllo non si puo' fare.
-INSTALLED = ("craft-bridge-mcp.py", "craft-bridge-ident.py")
+# (Le posizioni delle app non stanno qui: le risolve il sistema, e la tabella dello
+# shim ne resta la conferma — vedi `check_locations`.)
+INSTALLED = ("craft-bridge-mcp.py", "craft-bridge-ident.py", "craft-bridge-ui.py")
 
 
 def sha12(path: Path) -> str:
@@ -132,13 +140,14 @@ def entry_paths(entry: dict) -> dict:
 
 
 def check_config(config_path: Path, table: dict, install_dir: Path,
-                 token_file: str) -> list[dict]:
+                 token_file: str, control_file: str) -> list[dict]:
     """La config e' quella che l'installer scriverebbe? E i file che cita esistono?"""
     try:
         live = CONFIG.load_config(config_path).get("mcpServers", {})
     except (OSError, json.JSONDecodeError) as exc:
         return [result("config", "fail", f"illeggibile: {exc}", f"controlla {config_path}")]
-    plan = CONFIG.planned_entries(table, install_dir / IDENT.WRAPPER.name, token_file)
+    plan = CONFIG.planned_entries(table, install_dir / IDENT.WRAPPER.name, token_file,
+                                  install_dir=install_dir, control_file=control_file)
     to_fix = sorted(s for s in plan if live.get(s) != plan[s])
     out = [result("config", "fail",
                   f"{len(to_fix)} di {len(plan)} entry non sono quelle attese: {', '.join(to_fix)}",
@@ -180,6 +189,148 @@ def check_apps(table: dict, file_facts: dict | None = None) -> list[dict]:
     listed = ", ".join(sorted({str(v.get("version") or "?") for v in versions.values()}))
     return [result("eseguibili", "ok",
                    f"{len(table)} CLI e {len(table)} app presenti (versioni: {listed})")]
+
+
+def check_locations(table: dict) -> list[dict]:
+    """Chi dice dove sta l'app: il sistema o la tabella?
+
+    La tabella si scrive a mano; `App Paths` lo aggiorna l'installer dell'app, ed e' la
+    risposta che usa l'interfaccia di sistema quando apri l'app per nome. Il confronto e'
+    fra la cartella che il **sistema** registra per l'app e quella che la tabella dichiara
+    per la sua CLI: se divergono, la riga dice quale delle due si sta usando (il sistema
+    quando la CLI sta accanto all'app, la tabella quando li' non c'e') — un percorso
+    cablato che invecchia in silenzio e' il modo piu' facile per eseguire l'app sbagliata
+    senza che nessuno se ne accorga.
+    """
+    drift = []
+    for slug, spec in sorted(table.items()):
+        declared, used = str(spec.get("declared_cli") or ""), str(spec.get("cli") or "")
+        app = str(spec.get("app_exe") or "")
+        if not (declared and app) or Path(app).parent == Path(declared).parent:
+            continue
+        in_use = ("si usa quella del sistema" if used and Path(used).parent == Path(app).parent
+                  else "nessuna CLI accanto all'app: si usa quella della tabella")
+        drift.append(f"{slug}: sistema -> {Path(app).parent}, "
+                     f"tabella -> {Path(declared).parent} ({in_use})")
+    if drift:
+        return [result("posizione app", "nota",
+                       "il sistema e la tabella non concordano: " + "; ".join(drift),
+                       "allinea la tabella in craft-bridge-mcp.py (il percorso usato e' "
+                       "quello del sistema quando la CLI sta accanto all'app)")]
+    resolved = [slug for slug, spec in table.items()
+                if str(spec.get("cli_source") or "").startswith("registro")]
+    if resolved and len(resolved) == len(table):
+        return [result("posizione app", "ok",
+                       f"{len(resolved)} percorsi su {len(table)} dal registro App Paths: "
+                       f"la tabella conferma, non decide")]
+    if resolved:
+        rest = sorted(set(table) - set(resolved))
+        return [result("posizione app", "nota",
+                       f"{len(resolved)} di {len(table)} percorsi dal registro App Paths "
+                       f"(per {', '.join(rest)} vale la tabella)",
+                       "quelle app non si registrano da sole: la tabella resta la fonte")]
+    reason = ("questo sistema non ha un registro" if sys.platform != "win32"
+              else "nessuna app risulta registrata in App Paths")
+    return [result("posizione app", "nota",
+                   f"nessun percorso dal registro ({reason}): la tabella e' l'unica fonte",
+                   "su Windows le app installate si registrano da sole: se non c'e', "
+                   "l'app e' installata in modo diverso")]
+
+
+def check_translator(install_dir: Path, control_file: str) -> list[dict]:
+    """Le app servite dal traduttore: la finestra risponde, e con quali metodi?
+
+    Non e' un guasto che la finestra sia chiusa: la entry ripiega sul server headless
+    del fornitore, quindi il verdetto resta `nota` con l'azione per aprirla. E' invece
+    un guasto se il traduttore non risponde affatto, perche' allora l'entry non parte.
+    Il confronto del catalogo e' la parte che nessun altro puo' fare: la tabella dei
+    metodi e' una **copia** di quello che l'app dichiara, e quando l'app cambia idea
+    la differenza si vede qui invece di manifestarsi come un tool che non esiste.
+    """
+    rows = []
+    for slug in CONFIG.TRANSLATED:
+        translator = install_dir / "craft-bridge-ui.py"
+        if not translator.is_file():
+            translator = HERE / "craft-bridge-ui.py"
+        proc = subprocess.run(
+            [sys.executable, str(translator), "--slug", slug, "--control", control_file,
+             "--list", "--json"],
+            capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
+        if proc.returncode != 0 or not (proc.stdout or "").strip():
+            rows.append(result(f"finestra {slug}", "fail",
+                               f"il traduttore non risponde: {(proc.stderr or '').strip()[:120]}",
+                               "python craft-bridge-config.py --apply"))
+            continue
+        try:
+            report = json.loads(proc.stdout)
+        except json.JSONDecodeError:
+            rows.append(result(f"finestra {slug}", "fail", "uscita del traduttore non JSON",
+                               "python craft-bridge-config.py --apply"))
+            continue
+        if report.get("mode") != "bridged":
+            rows.append(result(f"finestra {slug}", "nota",
+                               f"non guidabile ora ({report.get('mode_why')}): l'entry "
+                               f"parla col server headless del fornitore",
+                               f"avvia l'app con --control {control_file}"))
+            continue
+        window = report.get("window") or {}
+        detail = (f"bridged sulla porta {report.get('port')} (pid {report.get('pid')}), "
+                  f"finestra {window.get('width')}x{window.get('height')} punti")
+        drift = report.get("drift") or {}
+        if drift.get("checked") and not drift.get("same"):
+            extra = []
+            if drift.get("only_theirs"):
+                extra.append(f"l'app ha in piu': {', '.join(drift['only_theirs'])}")
+            if drift.get("only_ours"):
+                extra.append(f"noi abbiamo in piu': {', '.join(drift['only_ours'])}")
+            rows.append(result(f"finestra {slug}", "nota",
+                               f"{detail}; il catalogo dei metodi diverge ({'; '.join(extra)})",
+                               "allinea METHODS in craft-bridge-ui.py a quello che l'app "
+                               "dichiara"))
+        elif drift.get("checked"):
+            rows.append(result(f"finestra {slug}", "ok",
+                               f"{detail}; {drift.get('ours')} metodi, gli stessi che "
+                               f"dichiara l'app"))
+        else:
+            rows.append(result(f"finestra {slug}", "nota",
+                               f"{detail}; catalogo non confrontabile "
+                               f"({drift.get('why')})",
+                               "l'app non elenca i metodi quando ne riceve uno "
+                               "sconosciuto: la tabella resta la fonte"))
+    return rows
+
+
+def check_bridge_flags(table: dict, timeout: float = 20.0) -> list[dict]:
+    """Il flag di aggancio **verificato**, non dichiarato: lo dice l'help di ogni CLI.
+
+    La tabella promette un'opzione per guidare la finestra (`--connect`/`--bridge`), e
+    per le app del traduttore promette che quell'opzione **non** c'e'. Sono promesse su
+    una interfaccia che non e' la nostra, quindi si chiedono alla CLI stessa: se l'help
+    non nomina il flag dichiarato, la tabella sta affermando qualcosa che la CLI non
+    conferma, e il guasto si vedrebbe solo alla prima connessione. Una CLI che non da'
+    un help non e' un ok: e' una lacuna, e questa riga lo dice.
+    """
+    report = SHIM.flag_report(table, timeout=timeout)
+    total, confirmed = report["total"], len(report["ok"])
+    diverging = report["diverging"]
+    unreadable = report["unreadable"]
+    if diverging:
+        detail = "; ".join(f"{r['check']}: {r['detail']}" for r in report["rows"]
+                          if r["state"] == "diverge")
+        return [result("flag di aggancio", "fail", detail,
+                       "allinea il flag nella tabella dello shim a quello che l'help "
+                       "della CLI documenta; per vedere la tabella: "
+                       "`python craft-bridge-mcp.py --flags`")]
+    if unreadable:
+        return [result("flag di aggancio", "nota",
+                       f"{confirmed}/{total} confermati dall'help della CLI; "
+                       f"non leggibile per {', '.join(unreadable)}: li' il flag resta "
+                       f"una dichiarazione della tabella",
+                       "lancia la CLI di quelle app con --help: se non lo stampa, la "
+                       "tabella e' l'unica fonte")]
+    return [result("flag di aggancio", "ok",
+                   f"{confirmed}/{total} app: l'help della CLI documenta il flag che la "
+                   f"tabella usa (11 agganci, 1 per traduzione)")]
 
 
 def check_published(table: dict, feed_dir: Path, file_facts: dict | None = None) -> list[dict]:
@@ -318,16 +469,24 @@ def main() -> int:
     parser.add_argument("--install-dir", default=str(CONFIG.DEFAULT_INSTALL_DIR))
     parser.add_argument("--token-file",
                         default=str(Path.home() / ".craft-bridge" / "photocraft.token"))
+    parser.add_argument("--control-file",
+                        default=str(Path.home() / ".craft-bridge" / "pdfcraft-control.json"),
+                        help="file di controllo dell'app servita dal traduttore")
     parser.add_argument("--no-live", action="store_true",
                         help="salta le porte: solo repo, shim, config, eseguibili")
+    parser.add_argument("--flag-timeout", type=float, default=20.0,
+                        help="secondi per l'help di una CLI (default 20)")
     parser.add_argument("--feed-dir", default=str(FEED.default_feed_dir()),
                         help="cartella del feed del launcher (default: quella di questo sistema)")
+    parser.add_argument("--apps-file",
+                        help="tabella delle app da un file, invece che dallo shim: serve a "
+                             "provare la diagnosi su una tabella di prova")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
 
     config_path, install_dir = Path(args.config), Path(args.install_dir)
     try:
-        table = CONFIG.apps_table()
+        table = CONFIG.apps_table(args.apps_file)
     except SystemExit as exc:
         print(f"tabella delle app illeggibile: {exc}", file=sys.stderr)
         return 3
@@ -344,9 +503,15 @@ def main() -> int:
                                         for s in table.values()])
     except (SystemExit, OSError):
         exe_facts = {}
-    rows += check_config(config_path, table, install_dir, args.token_file)
+    # La tabella delle app **servite dal ponte**: quelle dello shim piu' quella del
+    # traduttore. La usano due controlli: la si legge una volta sola.
+    bridge_apps = CONFIG.bridge_table(args.apps_file)
+    rows += check_config(config_path, table, install_dir, args.token_file, args.control_file)
     rows += check_apps(table, exe_facts)
-    rows += check_published(table, Path(args.feed_dir), exe_facts)
+    rows += check_locations(table)
+    rows += check_bridge_flags(bridge_apps, timeout=args.flag_timeout)
+    rows += check_translator(install_dir, args.control_file)
+    rows += check_published(bridge_apps, Path(args.feed_dir), exe_facts)
     if not args.no_live:
         rows += check_live(table, entries, exe_facts)
 

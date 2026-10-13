@@ -13,6 +13,12 @@ qualsiasi altra entry non elencata qui restano intatte.
     python craft-bridge-config.py --json           # solo le entry generate
 
 La tabella delle app arriva dal wrapper stesso (`--dump-apps`): una sola fonte.
+
+PdfCraft e' l'eccezione, e adesso ha una voce come le altre. Il suo server MCP non
+sa agganciarsi alla finestra (`mcp --connect` non esiste), quindi la entry non punta
+alla CLI ma al **traduttore** `craft-bridge-ui.py`, che espone i metodi della
+finestra un processo per chiamata e ripiega sul server headless del fornitore quando
+la finestra non c'e'. `--restore` rimette la entry del fornitore, come per le altre.
 """
 from __future__ import annotations
 
@@ -30,13 +36,30 @@ WRAPPER = HERE / "craft-bridge-mcp.py"
 # versione dichiarata dall'app): va installato accanto a lui, altrimenti lo shim
 # installato non puo' rispondere e resta senza il controllo.
 IDENT = HERE / "craft-bridge-ident.py"
-FILES = (WRAPPER, IDENT)
+# Il traduttore della finestra di PdfCraft: e' il `command` della sua entry, quindi
+# deve stare accanto agli altri due, o il connettore non parte.
+UI = HERE / "craft-bridge-ui.py"
+FILES = (WRAPPER, IDENT, UI)
+TRANSLATED = ("pdfcraft",)                    # app servite dal traduttore, non dallo shim
 DEFAULT_INSTALL_DIR = Path.home() / "AppData" / "Local" / "Programs" / "craft-bridge"
 DEFAULT_CONFIG = Path.home() / ".agents" / "mcp.json"
 PYTHON = Path.home() / "AppData" / "Local" / "Programs" / "Python" / "Python312" / "python.exe"
 
 
-def apps_table() -> dict:
+def apps_table(source: str | None = None) -> dict:
+    """La tabella delle app come la dichiara lo shim (`--dump-apps`).
+
+    `source` e' un file con la stessa forma: serve a chi deve provare la diagnosi su
+    una tabella che non conferma se stessa (una CLI che non documenta piu' il flag)
+    senza toccare ne' le app installate ne' la tabella vera. E' la stessa idea di
+    `--config` e `--feed-dir`: un punto in cui iniettare il caso, non un secondo
+    percorso di codice.
+    """
+    if source:
+        try:
+            return json.loads(Path(source).read_text(encoding="utf-8-sig"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise SystemExit(f"tabella delle app illeggibile ({source}): {exc}")
     proc = subprocess.run(
         [sys.executable, str(WRAPPER), "--dump-apps"],
         capture_output=True, text=True, encoding="utf-8",
@@ -46,11 +69,72 @@ def apps_table() -> dict:
     return json.loads(proc.stdout)
 
 
+def bridge_table(source: str | None = None) -> dict:
+    """La tabella delle app **servite dal ponte**: quelle dello shim piu' le tradotte.
+
+    Le app del traduttore non stanno nella tabella dello shim perche' non hanno un
+    canale su porta nota; ma il ponte le serve, quindi chi confronta la build
+    installata con quella pubblicata le deve guardare anche loro. Il percorso della CLI
+    lo risolve il traduttore, la stessa fonte della sua entry (una sola risoluzione).
+    """
+    table = dict(apps_table(source))
+    for slug in TRANSLATED:
+        if slug in table:
+            continue
+        paths = translator_paths(slug)
+        # `flag: None` e' la dichiarazione che questa CLI non ha un flag di aggancio, e
+        # `control_flag` e' quello che usa invece: cosi' la verifica contro l'help della
+        # CLI puo' controllare tutte e due le cose (assenza del ponte, presenza del
+        # canale) senza una seconda tabella scritta a mano.
+        table[slug] = {"cli": paths["cli"], "cli_source": paths["cli_source"],
+                       "translated": True, "flag": None,
+                       "control_flag": paths.get("control_flag", "--control"),
+                       "app_exe": None, "app_hive": None}
+    return table
+
+
 def entry_for(slug: str, spec: dict, port: int, wrapper_path: Path, token_file: str | None):
     args = [str(wrapper_path), "--slug", slug, "--port", str(port)]
     if spec.get("needs_token"):
         args += ["--token-file", token_file]
     return {"type": "stdio", "command": str(PYTHON), "args": args, "env": {}}
+
+
+def translator_entry(install_dir: Path, slug: str, control_file: str) -> dict:
+    """La entry di un'app servita dal traduttore: nessuna porta, un file di controllo.
+
+    La porta di PdfCraft la sceglie l'app e la scrive nel file: metterla in config
+    sarebbe scrivere un numero che non le appartiene.
+    """
+    return {"type": "stdio", "command": str(PYTHON),
+            "args": [str(install_dir / UI.name), "--slug", slug,
+                     "--control", control_file],
+            "env": {}}
+
+
+def translator_paths(slug: str) -> dict:
+    """CLI e file di controllo secondo il **traduttore** (una sola risoluzione).
+
+    Il percorso della CLI non si scrive qui: lo risolve il traduttore dal registro di
+    sistema, ed e' lo stesso che usera' quando la finestra non c'e' e delega al server
+    headless. Se il traduttore non risponde si resta senza, e la entry `--restore` lo
+    dice usando il percorso standard.
+    """
+    fallback = {"cli": str(Path(r"C:\Program Files") / slug.capitalize() / f"{slug}-cli.exe"),
+                "cli_source": "ripiego", "control": str(Path.home() / ".craft-bridge" /
+                                                       f"{slug}-control.json")}
+    proc = subprocess.run([sys.executable, str(UI), "--slug", slug, "--where", "--json"],
+                          capture_output=True, text=True, encoding="utf-8",
+                          errors="replace")
+    if proc.returncode != 0 or not (proc.stdout or "").strip():
+        return fallback
+    try:
+        data = json.loads(proc.stdout)
+    except json.JSONDecodeError:
+        return fallback
+    return {"cli": data.get("cli") or fallback["cli"],
+            "cli_source": data.get("cli_source") or "traduttore",
+            "control": data.get("control") or fallback["control"]}
 
 
 def load_config(path: Path) -> dict:
@@ -60,7 +144,9 @@ def load_config(path: Path) -> dict:
 
 
 def planned_entries(table: dict, wrapper_path: Path, token_file: str,
-                    overrides: dict | None = None, restore: bool = False) -> dict:
+                    overrides: dict | None = None, restore: bool = False,
+                    install_dir: Path | None = None,
+                    control_file: str | None = None) -> dict:
     """Le entry che questo installer scriverebbe, senza toccare niente.
 
     Una sola definizione: la usano sia `--apply` sia `craft-bridge-doctor.py` per
@@ -73,6 +159,17 @@ def planned_entries(table: dict, wrapper_path: Path, token_file: str,
         else:
             port = int((overrides or {}).get(slug, spec["port"]))
             plan[slug] = entry_for(slug, spec, port, wrapper_path, token_file)
+
+    # Le app del traduttore non stanno nella tabella dello shim (non hanno un canale
+    # su porta nota), quindi la loro entry si costruisce qui, dalla stessa funzione che
+    # legge `doctor`: se le due divergessero, la diagnosi accuserebbe una config giusta.
+    for slug in TRANSLATED:
+        if restore:
+            plan[slug] = {"type": "stdio", "command": translator_paths(slug)["cli"],
+                          "args": ["mcp"], "env": {}}
+        else:
+            plan[slug] = translator_entry(install_dir or DEFAULT_INSTALL_DIR, slug,
+                                          control_file or translator_paths(slug)["control"])
     return plan
 
 
@@ -83,6 +180,9 @@ def main() -> int:
     parser.add_argument("--port", action="append", default=[], help="slug=porta (ripetibile)")
     parser.add_argument("--token-file",
                         default=str(Path.home() / ".craft-bridge" / "photocraft.token"))
+    parser.add_argument("--control-file",
+                        default=str(Path.home() / ".craft-bridge" / "pdfcraft-control.json"),
+                        help="file di controllo scritto dall'app servita dal traduttore")
     parser.add_argument("--apply", action="store_true")
     parser.add_argument("--restore", action="store_true")
     parser.add_argument("--json", action="store_true")
@@ -95,7 +195,8 @@ def main() -> int:
 
     wrapper_path = install_dir / WRAPPER.name
     plan = planned_entries(table, wrapper_path, args.token_file,
-                           overrides=overrides, restore=args.restore)
+                           overrides=overrides, restore=args.restore,
+                           install_dir=install_dir, control_file=args.control_file)
 
     if args.json:
         print(json.dumps({"mcpServers": plan}, indent=2))

@@ -28,6 +28,10 @@ HERE = Path(__file__).resolve().parent
 PROBE = HERE / "craft-bridge-probe.py"
 DEFAULT_CONFIG = Path.home() / ".agents" / "mcp.json"
 
+# Le entry che dichiarano un modo (bridged o headless): lo shim per le 11 app con
+# canale su porta, il traduttore per PdfCraft, che l'MCP non ce l'ha.
+BRIDGES = ("craft-bridge-mcp.py", "craft-bridge-ui.py")
+
 
 def run_entry(command: str, argv: list[str], tool: str | None, tool_args: str) -> dict:
     cmd = [sys.executable, str(PROBE), "--cmd", command, "--tool-args", tool_args, "--json"]
@@ -79,12 +83,13 @@ def main() -> int:
             continue
         argv = entry.get("args") or []
         result = run_entry(entry["command"], argv, args.tool, args.tool_args)
-        # La modalita' riguarda solo le entry che passano dallo shim: artcraft (proxy
-        # di protocollo) e pdfcraft (meccanismo diverso) non ne hanno una.
-        is_shim = any("craft-bridge-mcp.py" in a for a in argv)
-        mode = detect_mode(result.get("stderr", "")) if is_shim else "n/a"
+        # La modalita' riguarda le entry che scelgono fra finestra e headless: lo shim
+        # e, per PdfCraft, il traduttore - che scrive la stessa riga su stderr. Le
+        # altre (artcraft, proxy di protocollo) non ne hanno una.
+        is_bridge = any(marker in a for a in argv for marker in BRIDGES)
+        mode = detect_mode(result.get("stderr", "")) if is_bridge else "n/a"
         ok = bool(result.get("ok")) and not result.get("is_error")
-        if args.expect != "any" and is_shim and mode != args.expect:
+        if args.expect != "any" and is_bridge and mode != args.expect:
             ok = False
         if not ok:
             failures += 1
@@ -105,9 +110,9 @@ def main() -> int:
     if args.json:
         print(json.dumps({"rows": rows, "failures": failures}, indent=2))
 
-    shim_rows = [r for r in rows if r["mode"] != "n/a"]
+    bridge_rows = [r for r in rows if r["mode"] != "n/a"]
     print(f"\n{len(rows) - failures}/{len(rows)} entry verificate "
-          f"({len(shim_rows)} con shim, atteso: {args.expect}) -> "
+          f"({len(bridge_rows)} con ponte, atteso: {args.expect}) -> "
           f"{'TUTTO OK' if failures == 0 else 'FALLIMENTI'}")
     if args.tool:
         for row in rows:

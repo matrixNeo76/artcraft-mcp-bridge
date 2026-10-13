@@ -19,6 +19,9 @@ o `craft-bridge-launch.py`, pretende l'esito giusto e poi rimette a posto.
     installata != pubblicata      feed / doctor                scostamento / nota
     feed assente o illeggibile    feed                         uscita 3 (non un guasto)
     byte pubblicati != installati feed                         FIX byte (archivio manomesso incluso)
+    tabella contro registro       shim / doctor / launcher     registro prima, differenza a vista
+    finestra PdfCraft assente     traduttore                   l'entry resta valida: headless
+    chiamata del traduttore       traduttore                   un processo CLI, esito o guasto
 
 Regole di sicurezza, applicate sempre:
 
@@ -58,9 +61,11 @@ Esito:
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import importlib.util
 import json
+import os
 import re
 import secrets
 import shutil
@@ -69,6 +74,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import zipfile
 from datetime import datetime
@@ -96,6 +102,10 @@ DOC = _load("craft_bridge_doctor", "craft-bridge-doctor.py")
 IDENT = DOC.IDENT
 CONFIG = DOC.CONFIG
 FEED = DOC.FEED
+SHIM = _load("craft_bridge_mcp", "craft-bridge-mcp.py")
+LAUNCH = _load("craft_bridge_launch", "craft-bridge-launch.py")
+UI = _load("craft_bridge_ui", "craft-bridge-ui.py")
+PILOT = _load("craft_bridge_pilot", "craft-bridge-pilot.py")
 
 
 # ---------------------------------------------------------------------------------
@@ -287,6 +297,557 @@ def t_missing_exe(run: Runner) -> tuple[str, str]:
     if rows[0]["state"] != "fail" or "lightcraft" not in detail:
         return "FAIL", f"non accusato: {detail}"
     return "PASS", detail.split("mancano:")[-1].strip()
+
+
+@case("posizione dell'app dal sistema", "unit")
+def t_locations(run: Runner) -> tuple[str, str]:
+    """La tabella dichiara, il sistema decide: si prova senza toccare il registro."""
+    where = run.tmp / "programmi" / "Finto"
+    where.mkdir(parents=True)
+    (where / "finto.exe").write_bytes(b"app")
+    (where / "finto-cli.exe").write_bytes(b"cli accanto all'app")
+    declared = run.tmp / "tabella"
+    declared.mkdir()
+    (declared / "finto-cli.exe").write_bytes(b"cli dichiarata da noi")
+
+    problems = []
+    def want(condition: bool, why: str) -> None:
+        if not condition:
+            problems.append(why)
+
+    cli, source = SHIM.choose_cli(str(where / "finto.exe"), str(declared / "finto-cli.exe"))
+    want(cli == str(where / "finto-cli.exe") and source == "registro App Paths",
+         f"app registrata con CLI accanto: scelto {cli} ({source})")
+    _, source_hive = SHIM.choose_cli(str(where / "finto.exe"), str(declared / "finto-cli.exe"),
+                                     "utente")
+    want(source_hive == "registro App Paths (utente)",
+         f"l'hive non compare nella fonte: {source_hive}")
+    want(SHIM.cli_beside(str(where / "finto.exe")) == where / "finto-cli.exe",
+         "il nome della CLI accanto all'app non e' derivato come atteso")
+
+    # Anche l'**avvio** usa il percorso del sistema: l'eseguibile registrato, non una
+    # stringa ricavata dalla CLI. Con quel campo assente (sistema senza registro) resta
+    # la derivazione dalla tabella.
+    registered = {"cli": str(where / "finto-cli.exe"), "app_exe": str(where / "finto.exe")}
+    want(LAUNCH.app_exe_of(registered) == where / "finto.exe",
+         f"l'avvio non usa l'eseguibile registrato: {LAUNCH.app_exe_of(registered)}")
+    want(LAUNCH.app_exe_of({"cli": str(where / "finto-cli.exe"), "app_exe": None})
+         == where / "finto.exe",
+         "senza registro non si ricade sull'eseguibile derivato dalla CLI")
+
+    lonely = run.tmp / "programmi" / "Sola"
+    lonely.mkdir()
+    (lonely / "sola.exe").write_bytes(b"app senza CLI")
+    cli2, source2 = SHIM.choose_cli(str(lonely / "sola.exe"), str(declared / "finto-cli.exe"))
+    want(cli2 == str(declared / "finto-cli.exe") and source2 == "tabella",
+         f"app registrata senza CLI accanto: scelto {cli2} ({source2})")
+
+    mai = run.tmp / "mai" / "x-cli.exe"
+    cli3, source3 = SHIM.choose_cli(None, str(mai))
+    want(cli3 == str(mai) and "assente" in source3,
+         f"nessuna fonte e percorso inesistente: {cli3} ({source3})")
+    # La diagnosi deve **vedere** la divergenza fra sistema e tabella, e dire quale
+    # delle due sta usando: senza quel pezzo la differenza resterebbe invisibile.
+    declared_cli = str(declared / "finto-cli.exe")
+    table = {"finta": {"cli": declared_cli, "declared_cli": declared_cli,
+                       "app_exe": str(where / "finto.exe"), "cli_source": "tabella"}}
+    rows = DOC.check_locations(table)
+    want(rows[0]["state"] == "nota" and "sistema ->" in rows[0]["detail"]
+         and "tabella ->" in rows[0]["detail"],
+         f"la divergenza non viene mostrata: {rows[0]}")
+    want("si usa quella della tabella" in rows[0]["detail"],
+         f"il doctor non dice quale percorso sta usando: {rows[0]['detail']}")
+
+    table["finta"].update({"cli": str(where / "finto-cli.exe"),
+                           "cli_source": "registro App Paths"})
+    rows2 = DOC.check_locations(table)
+    want("si usa quella del sistema" in rows2[0]["detail"],
+         f"il doctor non riconosce la CLI accanto all'app: {rows2[0]['detail']}")
+
+    if problems:
+        return "FAIL", "; ".join(problems)[:200]
+    return "PASS", ("registro prima, tabella poi, e l'assenza si dichiara; "
+                    "l'avvio prende l'eseguibile registrato")
+
+
+@case("app registrate dal sistema", "static", env=True)
+def t_locations_live(run: Runner) -> tuple[str, str]:
+    """Su questa macchina: i percorsi vengono dal registro, e la tabella li conferma."""
+    table = SHIM.app_table()
+    from_registry = [slug for slug, spec in table.items()
+                     if spec["cli_source"].startswith("registro App Paths")]
+    if len(from_registry) != len(table):
+        rest = sorted(set(table) - set(from_registry))
+        return "FAIL", f"dal registro {len(from_registry)} di {len(table)}: {rest}"
+    hives = {slug: spec["app_hive"] for slug, spec in table.items()}
+    wrong_hive = [slug for slug, hive in hives.items() if hive not in ("utente", "macchina")]
+    if wrong_hive:
+        return "FAIL", f"hive non riconosciuto per: {wrong_hive}"
+    # Il launcher e' installato **per utente** (sta in `%LOCALAPPDATA%`): la sua voce
+    # sta in `HKCU` e non in `HKLM`. Se questo caso dice "macchina", l'utente non viene
+    # nemmeno consultato e un'installazione per-utente resterebbe invisibile.
+    launcher_exe, launcher_hive = SHIM.registered_exe("artcraft-launcher")
+    if not launcher_exe or launcher_hive != "utente":
+        return "FAIL", (f"il launcher risulta {launcher_hive} invece che utente: "
+                         f"HKCU non viene letto ({launcher_exe})")
+    rows = DOC.check_locations(table)
+    if rows[0]["state"] != "ok" or "registro" not in rows[0]["detail"]:
+        return "FAIL", f"doctor non conferma la posizione: {rows[0]}"
+    drifted = [slug for slug, spec in table.items() if spec["declared_cli"] != spec["cli"]]
+    if drifted:
+        return "FAIL", f"tabella e registro divergono su {drifted}"
+    # L'avvio deve prendere lo **stesso** percorso che il sistema registra: se lanciasse
+    # un eseguibile ricavato dalla CLI, un'app spostata verrebbe avviata da un percorso
+    # vecchio anche quando il registro dice dove sta davvero.
+    wrong = [slug for slug, spec in table.items()
+             if not spec["app_exe"] or LAUNCH.app_exe_of(spec) != Path(spec["app_exe"])]
+    if wrong:
+        return "FAIL", f"l'avvio non usa l'eseguibile registrato per: {wrong}"
+    return "PASS", (f"{len(from_registry)}/{len(table)} percorsi dal registro App Paths, "
+                    "hive utente e macchina, tabella confermata, avvio sull'eseguibile "
+                    "registrato")
+
+
+class FakeWindow:
+    """Un finto PdfCraft: risponde sul canale come risponde l'app vera.
+
+    Il protocollo e' quello misurato sull'app (autenticazione col token del file di
+    controllo, poi `ui.<metodo>`), riprodotto nella parte che serve a provare il
+    traduttore: la credenziale, `ui.state` per la scelta del modo, un'eco per gli
+    altri metodi, un guasto vero quando si chiede un'etichetta che non esiste.
+    Cosi' il traduttore si prova senza app e senza finestra.
+    """
+
+    def __init__(self, token: str = "t" * 32) -> None:
+        self.token = token
+        self.requests: list[dict] = []
+        self.refuse_auth = False
+        self.srv = socket.socket()
+        self.srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.srv.bind(("127.0.0.1", 0))
+        self.port = int(self.srv.getsockname()[1])
+        self.srv.listen(8)
+        self.srv.settimeout(0.2)
+        self.stop = threading.Event()
+        threading.Thread(target=self._serve, daemon=True).start()
+
+    def control_file(self, path: Path) -> Path:
+        path.write_text(json.dumps({"pid": os.getpid(), "port": self.port,
+                                    "token": self.token}), encoding="utf-8")
+        return path
+
+    def close(self) -> None:
+        self.stop.set()
+        self.srv.close()
+
+    def sent(self, method: str) -> list[dict]:
+        return [r for r in self.requests if r.get("method") == method]
+
+    def _serve(self) -> None:
+        while not self.stop.is_set():
+            try:
+                conn, _ = self.srv.accept()
+            except (socket.timeout, OSError):
+                continue
+            with conn:
+                buf = b""
+                try:
+                    conn.settimeout(5)
+                    while True:
+                        data = conn.recv(65536)
+                        if not data:
+                            break
+                        buf += data
+                        while b"\n" in buf:
+                            line, buf = buf.split(b"\n", 1)
+                            if line.strip():
+                                self._answer(conn, json.loads(line))
+                except (OSError, json.JSONDecodeError):
+                    pass
+
+    def _answer(self, conn, request: dict) -> None:
+        self.requests.append(request)
+        rid, method = request.get("id"), request.get("method")
+        params = request.get("params") or {}
+        if method == "auth":
+            reply = ({"id": rid, "error": {"code": -32001, "message": "token rifiutato"}}
+                     if self.refuse_auth else {"id": rid, "result": {"ok": True}})
+        elif method == "ui.state":
+            reply = {"id": rid, "result": {"window": {"width": 1440, "height": 920},
+                                           "documents": []}}
+        elif method == "ui.screenshot":
+            reply = {"id": rid, "result": {
+                "png_base64": base64.b64encode(b"PNGfinto").decode(),
+                "width": 4, "height": 3}}
+        elif method == "ui.commands":
+            reply = {"id": rid, "result": {"commands": [{"id": "file.open",
+                                                          "label": "Apri"}]}}
+        elif method == "ui.click" and params.get("label"):
+            reply = {"id": rid, "error": {"code": -32602,
+                                           "message": f"no enabled clickable widget "
+                                                      f"labelled {params['label']!r}"}}
+        else:
+            reply = {"id": rid, "result": {"eco": params}}
+        conn.sendall((json.dumps(reply) + "\n").encode())
+
+
+def ui_command(control: Path, *extra: str) -> list[str]:
+    """Il comando con cui un client MCP avvierebbe il traduttore."""
+    return [sys.executable, str(HERE / "craft-bridge-ui.py"), "--slug", "pdfcraft",
+            "--control", str(control), *extra]
+
+
+def ui_declared_mode(control: Path, *extra: str) -> tuple[int, str, str]:
+    """Il modo dichiarato su stderr: stdin chiuso, il server decide e poi esce."""
+    proc = subprocess.run(ui_command(control, *extra), input="", capture_output=True,
+                          text=True, encoding="utf-8", errors="replace", timeout=120)
+    return proc.returncode, proc.stdout or "", proc.stderr or ""
+
+
+def ui_open_session(control: Path, *extra: str):
+    """Una sessione MCP vera col traduttore, col client del progetto (pilot)."""
+    client = PILOT.McpClient(ui_command(control, *extra))
+    init = client.rpc("initialize", {"protocolVersion": "2025-06-18", "capabilities": {},
+                                     "clientInfo": {"name": "craft-bridge-tests",
+                                                    "version": "1"}})
+    return client, init
+
+
+def ui_close_session(client) -> None:
+    try:
+        client.proc.terminate()
+        client.proc.wait(timeout=20)
+    except (OSError, subprocess.TimeoutExpired):
+        try:
+            client.proc.kill()
+        except OSError:
+            pass
+
+
+@case("argomenti della chiamata", "unit")
+def t_ui_args(run: Runner) -> tuple[str, str]:
+    """Un metodo -> una riga di comando. Funzione pura: nessun processo, nessuna rete.
+
+    Il punto delicato e' la tipizzazione: la CLI interpreta ogni `key=value` come
+    JSON, quindi `true` diventa un booleano e `"true"` resta una stringa. Se la
+    conversione sbagliasse, all'app arriverebbe un parametro di tipo diverso — e il
+    metodo farebbe un'altra cosa invece di fallire.
+    """
+    cli, control = "cli.exe", Path("control.json")
+    problems = []
+
+    def want(argv: list[str], tail: list[str], why: str) -> None:
+        if argv[-len(tail):] != tail:
+            problems.append(f"{why}: {argv[-len(tail):]} invece di {tail}")
+
+    want(UI.method_argv(cli, control, "click", {"x": 100, "y": 250}),
+         ["click", "x=100", "y=250"], "numeri")
+    want(UI.method_argv(cli, control, "type", {"text": "true"}),
+         ["type", 'text="true"'], "stringa che sembra un booleano")
+    want(UI.method_argv(cli, control, "type", {"text": "ciao=mondo"}),
+         ["type", 'text="ciao=mondo"'], "stringa con un = dentro")
+    want(UI.method_argv(cli, control, "drag", {"from": [10, 10], "to": [20, 20]}),
+         ["drag", "from=[10, 10]", "to=[20, 20]"], "liste")
+    want(UI.method_argv(cli, control, "set", {"key": "theme", "value": None}),
+         ["set", "key=\"theme\"", "value=null"], "null")
+    want(UI.method_argv(cli, control, "set", {"key": "theme", "value": True}),
+         ["set", "key=\"theme\"", "value=true"], "booleano")
+    want(UI.method_argv(cli, control, "screenshot", {}, out="x.png"),
+         ["screenshot", "--out", "x.png"], "immagine su file")
+    argv = UI.method_argv(cli, control, "state", {})
+    if argv[:4] != [cli, "ui", "--control", str(control)]:
+        problems.append(f"intestazione inattesa: {argv[:4]}")
+    if problems:
+        return "FAIL", "; ".join(problems)[:220]
+    return "PASS", "numeri, stringhe (virgolettate), liste, null e booleani come li vuole la CLI"
+
+
+@case("sessione del traduttore", "unit")
+def t_ui_session(run: Runner) -> tuple[str, str]:
+    """Una sessione MCP vera contro un finto PdfCraft: 15 tool, e ogni chiamata un processo."""
+    fake = FakeWindow()
+    control = fake.control_file(run.tmp / "control.json")
+    client = None
+    try:
+        client, init = ui_open_session(control)
+        problems = []
+        info = (init.get("result") or {}).get("serverInfo") or {}
+        if info.get("name") != "pdfcraft-ui":
+            problems.append(f"serverInfo inatteso: {info}")
+        tools = (client.rpc("tools/list").get("result") or {}).get("tools") or []
+        names = {t["name"] for t in tools}
+        if names != {f"ui_{m}" for m in UI.METHODS}:
+            problems.append(f"catalogo inatteso: {sorted(names)[:6]}...")
+        read_only = {t["name"] for t in tools if (t.get("annotations") or {}).get("readOnlyHint")}
+        if read_only != {"ui_state", "ui_inspect", "ui_commands", "ui_screenshot"}:
+            problems.append(f"sola lettura inattesa: {sorted(read_only)}")
+
+        state = client.rpc("tools/call", {"name": "ui_state", "arguments": {}})
+        body = (state.get("result") or {})
+        if body.get("isError") or "1440" not in json.dumps(body):
+            problems.append(f"ui_state non ha riportato la finestra: {body}")
+
+        click = client.rpc("tools/call", {"name": "ui_click",
+                                          "arguments": {"x": 10, "y": 20}})
+        if (click.get("result") or {}).get("isError"):
+            problems.append("ui_click e' fallito su un peer che accetta")
+        sent = fake.sent("ui.click")
+        if not sent or sent[-1]["params"] != {"x": 10, "y": 20}:
+            problems.append(f"parametri arrivati all'app: {sent[-1]['params'] if sent else '-'}")
+
+        client.rpc("tools/call", {"name": "ui_type", "arguments": {"text": "true"}})
+        sent_t = fake.sent("ui.type")
+        if not sent_t or sent_t[-1]["params"].get("text") != "true":
+            problems.append(f"una stringa e' arrivata come {sent_t[-1]['params'] if sent_t else '-'}")
+
+        shot = client.rpc("tools/call", {"name": "ui_screenshot", "arguments": {}})
+        blocks = (shot.get("result") or {}).get("content") or []
+        if not blocks or blocks[0].get("type") != "image" or not blocks[0].get("data"):
+            problems.append(f"screenshot senza immagine: {blocks[:1]}")
+
+        bad = client.rpc("tools/call", {"name": "ui_click",
+                                         "arguments": {"label": "NonEsiste"}})
+        if not (bad.get("result") or {}).get("isError"):
+            problems.append("un guasto dell'app non e' arrivato come isError")
+        unknown = client.rpc("tools/call", {"name": "ui_inventato", "arguments": {}})
+        if (unknown.get("error") or {}).get("code") != -32602:
+            problems.append(f"tool sconosciuto: risposta {unknown}")
+        if client.proc.poll() is not None:
+            problems.append(f"il server e' morto (uscita {client.proc.returncode})")
+        # Il modo va chiesto **con la finestra ancora su**: dopo la chiusura sarebbe
+        # headless, e la prova direbbe un'altra cosa.
+        code, _out, err = ui_declared_mode(control)
+        if code != 0 or "modalita' bridged" not in err:
+            problems.append(f"modo dichiarato male (uscita {code}): {err.strip()[:140]}")
+
+        # E la finestra che sparisce **a meta' sessione**: la chiamata deve tornare un
+        # guasto con la diagnosi, non una risposta vuota che sembra riuscita.
+        fake.close()
+        gone = client.rpc("tools/call", {"name": "ui_state", "arguments": {}})
+        gone_text = ((gone.get("result") or {}).get("content") or [{}])[0].get("text", "")
+        if not (gone.get("result") or {}).get("isError"):
+            problems.append(f"finestra sparita: risposta senza guasto ({gone_text[:100]})")
+        elif "non risponde piu'" not in gone_text:
+            problems.append(f"finestra sparita senza diagnosi: {gone_text[:120]}")
+        if problems:
+            return "FAIL", "; ".join(problems)[:220]
+    finally:
+        if client is not None:
+            ui_close_session(client)
+        fake.close()
+    return "PASS", ("15 tool, parametri tipizzati, immagine, isError su guasto, "
+                    "-32602 sull'ignoto, modo bridged dichiarato, finestra sparita "
+                    "a meta' sessione diagnosticata")
+
+
+@case("senza finestra il traduttore ripiega", "unit")
+def t_ui_headless(run: Runner) -> tuple[str, str]:
+    """Finestra chiusa: la entry resta valida e parla col server **headless** del fornitore.
+
+    Il finto CLI qui e' un server MCP minimo: la prova e' che i suoi frame arrivino al
+    client attraverso il traduttore, senza riscritture e senza inventare tool.
+    """
+    fake_server = run.tmp / "finto-mcp.py"
+    fake_server.write_text(
+        "import json, sys\n"
+        "for line in sys.stdin:\n"
+        "    if not line.strip():\n"
+        "        continue\n"
+        "    req = json.loads(line)\n"
+        "    if req.get('method') == 'initialize':\n"
+        "        out = {'protocolVersion': '2025-06-18', 'serverInfo': {'name': 'finto'}}\n"
+        "    elif req.get('method') == 'tools/list':\n"
+        "        out = {'tools': [{'name': 'fake_tool', 'inputSchema': {'type': 'object'}}]}\n"
+        "    else:\n"
+        "        out = {}\n"
+        "    sys.stdout.write(json.dumps({'jsonrpc': '2.0', 'id': req.get('id'),\n"
+        "                                 'result': out}) + '\\n')\n"
+        "    sys.stdout.flush()\n", encoding="utf-8")
+    missing = run.tmp / "control-assente.json"
+    # Il comando headless della CLI vera e' `pdfcraft-cli mcp`: qui il ruolo della CLI
+    # lo fa l'interprete e il server finto e' l'argomento che gli si passa, cosi' la
+    # stessa catena (traduttore -> processo -> frame MCP) si prova senza il fornitore.
+    headless = ["--cli", sys.executable, "--headless-args", str(fake_server)]
+    code, _out, err = ui_declared_mode(missing, "--timeout", "20", *headless)
+    if code != 0 or "modalita' headless" not in err:
+        return "FAIL", f"il ripiego non e' stato dichiarato (uscita {code}): {err.strip()[:140]}"
+    client = PILOT.McpClient(ui_command(missing, *headless))
+    try:
+        tools = (client.rpc("tools/list").get("result") or {}).get("tools") or []
+        names = [t.get("name") for t in tools]
+        if names != ["fake_tool"]:
+            return "FAIL", f"i tool del server headless non sono passati: {names}"
+    finally:
+        ui_close_session(client)
+    return "PASS", "nessuna finestra: il server headless del fornitore passa attraverso, dichiarato"
+
+
+@case("finestra PdfCraft dal vivo", "static", env=True)
+def t_ui_live(run: Runner) -> tuple[str, str]:
+    """Sull'app vera: modo, catalogo e una chiamata. Salta (motivando) se e' chiusa."""
+    control = UI.CONTROL_DIR / "pdfcraft-control.json"
+    code, out, _err = run.run(str(HERE / "craft-bridge-ui.py"), "--slug", "pdfcraft",
+                              "--list", "--json")
+    if code != 0:
+        return "FAIL", f"il traduttore non risponde (uscita {code})"
+    report = json.loads(out)
+    if report.get("mode") != "bridged":
+        return "SKIP", f"finestra chiusa ({report.get('mode_why')}): l'entry va headless"
+    drift = report.get("drift") or {}
+    if not drift.get("checked"):
+        return "FAIL", f"catalogo non confrontabile dal vivo: {drift}"
+    if not drift.get("same"):
+        return "FAIL", (f"il catalogo diverge: solo dall'app {drift.get('only_theirs')}, "
+                        f"solo da noi {drift.get('only_ours')}")
+    code_state, out_state, _ = run.run(str(HERE / "craft-bridge-ui.py"), "--slug",
+                                       "pdfcraft", "--call", "state")
+    if code_state != 0:
+        return "FAIL", f"ui state sulla finestra e' uscito {code_state}"
+    state = json.loads(out_state)
+    if not state.get("window"):
+        return "FAIL", f"state senza finestra: {list(state)[:6]}"
+    return "PASS", (f"porta {report.get('port')} (pid {report.get('pid')}), "
+                    f"{drift.get('ours')} metodi come li dichiara l'app")
+
+
+def fake_cli(run: Runner, name: str, help_text: str) -> str:
+    """Una CLI finta: il suo `--help` stampa il testo dato.
+
+    Un `.cmd`, non un `.py`: la domanda e' cosa **la CLI** dichiara di saper fare, e
+    Windows esegue un .cmd direttamente. Il testo resta senza caratteri che la shell
+    interpreterebbe (`<`, `>`, `|`, `&`): qui si prova il confronto, non il quoting.
+    """
+    path = run.tmp / f"{name}.cmd"
+    body = "".join(f"echo {line}\n" for line in help_text.splitlines())
+    path.write_text("@echo off\n" + body, encoding="utf-8")
+    return str(path)
+
+
+HELP_CONNECT = "usage:\n  fintocraft-cli mcp [--connect PORT] [--sample]"
+HELP_BRIDGE = "usage:\n  altrocraft-cli mcp [--bridge PORT] [--autosave]"
+HELP_CONTROL = ("usage:\n  pdfcraft-cli ui --control FILE [method] [key=value]\n"
+                "  pdfcraft-cli mcp [--root DIR]")
+
+
+@case("flag di aggancio, verificato", "unit")
+def t_flag_verdict(run: Runner) -> tuple[str, str]:
+    """La tabella dichiara un flag; lo dichiara anche l'help della CLI? Adesso si chiede.
+
+    Le tre risposte che contano: confermato, **non confermato** (la tabella afferma
+    un'opzione che la CLI non nomina), e il caso rovesciato — un'app di cui la tabella
+    dice che *non* ha un aggancio: se l'help lo nomina, la tabella e' vecchia.
+    """
+    with_connect = fake_cli(run, "fintocraft", HELP_CONNECT)
+    with_bridge = fake_cli(run, "altrocraft", HELP_BRIDGE)
+    control_only = fake_cli(run, "fintocontrol", HELP_CONTROL)
+    cases = [
+        ("l'help lo documenta", {"cli": with_connect, "flag": "--connect"}, "ok"),
+        ("l'help non ne nomina nessuno", {"cli": control_only, "flag": "--connect"},
+         "diverge"),
+        ("l'help ne nomina un altro", {"cli": with_bridge, "flag": "--connect"}, "diverge"),
+        ("nessun aggancio, e il canale e' quello", {"cli": control_only, "flag": None,
+                                                    "control_flag": "--control",
+                                                    "translated": True}, "ok"),
+        ("nessun aggancio, ma l'help ce l'ha", {"cli": with_connect, "flag": None},
+         "diverge"),
+        ("la CLI non da' un help", {"cli": str(run.tmp / "assente.exe"),
+                                     "flag": "--connect"}, "non leggibile"),
+    ]
+    problems = []
+    for why, spec, expected in cases:
+        row = SHIM.flag_facts("fintocraft", spec, timeout=20)
+        if row["state"] != expected:
+            problems.append(f"{why}: {row['state']} invece di {expected} ({row['detail'][:60]})")
+    # Il verdetto complessivo, e la promessa negativa: "senza aggancio" vuol dire che
+    # l'help non nomina nessuno dei due flag.
+    report = SHIM.flag_report({"a": {"cli": with_connect, "flag": "--connect"},
+                              "b": {"cli": with_bridge, "flag": "--bridge"},
+                              "c": {"cli": control_only, "flag": None,
+                                    "control_flag": "--control"}}, timeout=20)
+    if report["diverging"] or len(report["ok"]) != 3:
+        problems.append(f"verdetto complessivo: {report['ok']} ok, "
+                        f"{report['diverging']} divergenti")
+    if problems:
+        return "FAIL", "; ".join(problems)[:220]
+    return "PASS", ("confermato, non confermato, flag diverso, assenza confermata "
+                    "e help illeggibile: sei verdetti, come li vuole l'help della CLI")
+
+
+@case("doctor: flag non confermato", "unit")
+def t_flag_doctor(run: Runner) -> tuple[str, str]:
+    """La diagnosi deve **dirlo**, non solo saperlo: la tabella mente, la riga accusa.
+
+    Tre giri del doctor (uno per verdetto), e non un quarto: ogni giro chiede l'help di
+    tutte le CLI, quindi costa. La terza e' quella che vede un runner di CI senza app
+    installate — le CLI non ci sono, e il verdetto deve essere una `nota` che lo dice,
+    non un `ok`.
+    """
+    def row_of(apps: dict, name: str) -> dict:
+        path = run.tmp / f"apps-{name}.json"
+        path.write_text(json.dumps(apps), encoding="utf-8")
+        code, out, err = run.run(str(HERE / "craft-bridge-doctor.py"),
+                                 "--apps-file", str(path), "--no-live", "--json")
+        try:
+            report = json.loads(out)
+        except json.JSONDecodeError:
+            return {"state": "?", "detail": f"uscita non JSON ({code}): {err.strip()[:80]}"}
+        return next((c for c in report["checks"] if c["check"] == "flag di aggancio"),
+                    {"state": "?", "detail": "riga assente"})
+
+    # La tabella dice `--connect`, la CLI annuncia `--bridge`: e' il caso che conta —
+    # un'app aggiornata che ha rinominato il flag lascerebbe la tabella a promettere
+    # un'opzione che non esiste piu'.
+    spec = {"cli": fake_cli(run, "fintocraft", HELP_BRIDGE), "flag": "--connect",
+            "addr": "{port}", "port": 7999, "cli_source": "tabella di prova",
+            "declared_cli": "fintocraft-cli.exe", "app_exe": None, "app_hive": None}
+    problems = []
+    lying = row_of({"fintocraft": spec}, "bugiarda")
+    if lying["state"] != "fail" or "fintocraft" not in lying["detail"]:
+        problems.append(f"tabella non confermata: {lying['state']} - {lying['detail'][:80]}")
+    if "--flags" not in lying.get("action", ""):
+        problems.append(f"l'azione non dice come guardare la tabella: {lying.get('action', '')[:60]}")
+    honest = row_of({"fintocraft": {**spec,
+                                    "cli": fake_cli(run, "fintocontrol", HELP_CONTROL),
+                                    "flag": None, "control_flag": "--control"}}, "onesta")
+    if honest["state"] != "ok":
+        problems.append(f"tabella confermata dal canale: {honest['state']} - {honest['detail'][:80]}")
+
+    # E la CLI **assente** (un runner senza app installate): non e' "ok", e' una lacuna
+    # dichiarata. E' l'esito che un runner di CI vede sempre, quindi deve essere giusto.
+    silent = row_of({"fintocraft": {**spec, "cli": str(run.tmp / "assente.exe")}},
+                    "assente")
+    if silent["state"] != "nota" or "non leggibile" not in silent["detail"]:
+        problems.append(f"CLI senza help: {silent['state']} - {silent['detail'][:80]}")
+    if problems:
+        return "FAIL", "; ".join(problems)[:220]
+    return "PASS", ("tabella non confermata -> FIX con l'azione; confermata dal canale "
+                    "-> ok; CLI assente -> nota")
+
+
+
+@case("flag di aggancio dal vivo", "static", env=True)
+def t_flag_live(run: Runner) -> tuple[str, str]:
+    """Sulle CLI vere: ognuna dice la sua, e la diagnosi dice la stessa cosa."""
+    code, out, err = run.run(str(HERE / "craft-bridge-mcp.py"), "--flags", "--json")
+    if code not in (0, 1) or not out.strip():
+        return "FAIL", f"il confronto non risponde (uscita {code}): {err.strip()[:120]}"
+    report = json.loads(out)
+    if report["diverging"]:
+        detail = "; ".join(f"{r['check']}: {r['detail']}" for r in report["rows"]
+                          if r["state"] == "diverge")
+        return "FAIL", f"la tabella dice un flag che la CLI non conferma -> {detail[:180]}"
+    if report["unreadable"]:
+        return "SKIP", (f"le CLI non danno un help per {', '.join(report['unreadable'])}: "
+                        f"li' il flag resta una dichiarazione della tabella")
+    code_d, out_d, err_d = run.run(str(HERE / "craft-bridge-doctor.py"), "--no-live", "--json")
+    if code_d not in (0, 1) or not out_d.strip():
+        return "FAIL", f"doctor non risponde (uscita {code_d}): {err_d.strip()[:120]}"
+    row = next((c for c in json.loads(out_d)["checks"]
+                if c["check"] == "flag di aggancio"), None)
+    if row is None or row["state"] != "ok":
+        return "FAIL", f"la diagnosi non conferma quello che le CLI dicono: {row}"
+    return "PASS", (f"{len(report['ok'])}/{report['total']} CLI documentano il flag della "
+                    f"tabella, e la diagnosi lo ripete")
 
 
 @case("confronto col feed del launcher", "unit")
@@ -598,13 +1159,16 @@ def t_bad_token(run: Runner) -> tuple[str, str]:
 
 
 ALL = [t_clean, t_stale_install, t_bad_entry, t_broken_path, t_missing_exe,
-       t_feed_compare, t_feed_bytes, t_feed_missing, t_feed_files, t_closed_port,
-       t_good_build, t_drift_build, t_wrong_app, t_bad_token]
+       t_locations, t_locations_live, t_feed_compare, t_feed_bytes, t_feed_missing,
+       t_feed_files, t_closed_port, t_good_build, t_drift_build, t_wrong_app, t_bad_token,
+       t_ui_args, t_ui_session, t_ui_headless, t_ui_live,
+       t_flag_verdict, t_flag_doctor, t_flag_live]
 
 # Gli strumenti che la suite verifica: le loro impronte finiscono nel report, cosi'
 # due esecuzioni a distanza si confrontano anche su *cosa* e' cambiato.
 FINGERPRINTED = ("craft-bridge-mcp.py", "craft-bridge-ident.py", "craft-bridge-doctor.py",
-                 "craft-bridge-config.py", "craft-bridge-feed.py", "craft-bridge-tests.py")
+                 "craft-bridge-config.py", "craft-bridge-feed.py", "craft-bridge-tests.py",
+                 "craft-bridge-ui.py")
 
 
 def tool_hashes() -> dict:

@@ -12,7 +12,10 @@ Le porte non sono scritte qui: si leggono dalla **config dello shim**
 sondera' all'avvio. Cosi' l'app ascolta esattamente dove lo shim guarda, e se un
 domani si cambia porta nella config il comando segue senza modifiche. La tabella
 delle app arriva dal wrapper stesso (`--dump-apps`), quindi anche i percorsi degli
-eseguibili hanno una sola fonte.
+eseguibili hanno una sola fonte — e quella fonte e' il **sistema**: l'eseguibile da
+avviare e' quello che il registro `App Paths` registra per quell'app, cioe' la
+stessa voce che Windows usa per aprirla per nome. La tabella scritta a mano resta
+come conferma e come ripiego dove il registro non c'e'.
 
 Uso:
     python craft-bridge-launch.py                       # tutte le app config
@@ -46,9 +49,16 @@ Craft", e' il nostro. `--verify` aggiunge la prova lato client: interroga lo shi
 e pretende `modalita' bridged`.
 
 Le app vengono staccate dalla shell (DETACHED_PROCESS): il comando ritorna
-appena i canali sono su, le finestre restano aperte. PdfCraft non c'e': il suo
-`--control` vuole un **file**, non una porta, e il suo MCP non ha un flag di
-bridge (§3.3) — non avrebbe un canale che lo shim possa sondare.
+appena i canali sono su, le finestre restano aperte.
+
+PdfCraft ha un trasporto diverso e per questo una strada diversa: il suo `--control`
+vuole un **file**, non una porta, e la porta la sceglie l'app scrivendola li' dentro.
+Si avvia anche lei da qui (l'app e' quella che il sistema registra, il file di
+controllo e' quello che cita la sua entry), ma la domanda "e' guidabile adesso?" non
+la risponde una porta fissa: la risponde il **traduttore**
+(`craft-bridge-ui.py --list`), che autentica col token del file e dice
+`bridged` o `headless`. Le app servite dal traduttore si riconoscono dalla entry:
+sono quelle che lo nominano.
 """
 from __future__ import annotations
 
@@ -66,6 +76,8 @@ PROBE = HERE / "craft-bridge-probe.py"
 IDENT = HERE / "craft-bridge-ident.py"
 DEFAULT_CONFIG = Path.home() / ".agents" / "mcp.json"
 LOGDIR = Path.home() / ".craft-bridge" / "launch-logs"
+SHIM = HERE / "craft-bridge-mcp.py"
+TRANSLATOR = "craft-bridge-ui.py"                # le app servite da lui, non dallo shim
 
 # Windows: il processo figlio non eredita la console e sopravvive alla shell.
 DETACHED_PROCESS = 0x00000008
@@ -111,6 +123,78 @@ def shim_entries(config_path: Path, table: dict) -> dict:
             "entry": [str(entry.get("command") or "")] + args,
         }
     return entries
+
+
+def translated_entries(config_path: Path) -> dict:
+    """slug -> entry delle app che passano dal traduttore (non dallo shim).
+
+    Il criterio e' la entry stessa: nomina `craft-bridge-ui.py`. Cosi' l'elenco non e'
+    una seconda copia scritta a mano, ma quello che la config fa davvero.
+    """
+    servers = json.loads(config_path.read_text(encoding="utf-8-sig")).get("mcpServers", {})
+    out = {}
+    for slug, entry in servers.items():
+        args = [str(a) for a in (entry.get("args") or [])]
+        script = next((a for a in args if Path(a).name == TRANSLATOR), None)
+        if not script:
+            continue
+        out[slug] = {
+            "translator": script,
+            "control": args[args.index("--control") + 1] if "--control" in args else None,
+            "entry": [str(entry.get("command") or "")] + args,
+        }
+    return out
+
+
+def translator_state(item: dict, timeout: float = 90.0) -> dict:
+    """Chiede al **traduttore** se la finestra risponde: e' lui che sa la risposta.
+
+    Non si replica qui la domanda (file di controllo, porta, token, autenticazione):
+    sarebbe la seconda implementazione della stessa cosa. Il report del traduttore
+    contiene il modo, la porta, il pid e il catalogo dei metodi.
+    """
+    argv = [sys.executable, str(item["translator"]), "--slug", item["slug"],
+            "--list", "--json"]
+    if item.get("control"):
+        argv += ["--control", str(item["control"])]
+    try:
+        proc = subprocess.run(argv, capture_output=True, text=True, encoding="utf-8",
+                              errors="replace", timeout=timeout)
+        return json.loads(proc.stdout)
+    except (subprocess.TimeoutExpired, json.JSONDecodeError, OSError) as exc:
+        return {"mode": "?", "mode_why": f"traduttore non interrogabile: {exc}"}
+
+
+def control_port(control: str | None) -> int | None:
+    """La porta che l'app ha scritto nel file di controllo (o None se non c'e' ancora).
+
+    Serve ad aspettare **poco**: leggere il file e provare la porta costa microsecondi,
+    mentre chiedere al traduttore vuol dire un processo CLI ogni volta. Al traduttore si
+    chiede una volta sola, quando la porta risponde.
+    """
+    if not control:
+        return None
+    try:
+        return int(json.loads(Path(control).read_text(encoding="utf-8-sig"))["port"])
+    except (OSError, json.JSONDecodeError, KeyError, ValueError, TypeError):
+        return None
+
+
+def app_executable(item: dict) -> str:
+    """L'eseguibile dell'app, dal **sistema**: lo risolve il traduttore, e lo dice lui.
+
+    Chiedere a lui evita due cose: una seconda copia della logica del registro, e un
+    percorso scritto a mano che invecchia in silenzio (l'app sta dove l'installer l'ha
+    registrata, non dove ce la ricordiamo).
+    """
+    proc = subprocess.run([sys.executable, str(item["translator"]), "--slug", item["slug"],
+                           "--where", "--json"], capture_output=True, text=True,
+                          encoding="utf-8", errors="replace", timeout=60)
+    try:
+        cli = str(json.loads(proc.stdout)["cli"])
+    except (json.JSONDecodeError, KeyError, OSError, TypeError):
+        return ""
+    return str(Path(cli).with_name(Path(cli).name.replace("-cli.exe", ".exe")))
 
 
 def port_open(port: int, host: str = "127.0.0.1") -> bool:
@@ -160,9 +244,25 @@ def tail_lines(log: Path, count: int) -> list[str]:
     return [l for l in lines if l][-count:]
 
 
+def app_exe_of(spec: dict) -> Path:
+    """L'eseguibile dell'app da avviare: quello che **il sistema** registra.
+
+    La tabella dichiara la CLI; dove sta l'app lo dice l'installer (le app sono
+    pacchetti MSI per macchina, e la voce `App Paths` e' quella che Windows usa per
+    aprirle per nome). Derivare il nome con una sostituzione di stringa era la
+    seconda copia della stessa informazione: se il registro dice dove sta l'app, si
+    avvia quella. La derivazione resta solo come ripiego per un sistema senza
+    registro, dove l'unica fonte e' la tabella.
+    """
+    registered = spec.get("app_exe")
+    if registered:
+        return Path(str(registered))
+    return Path(str(spec["cli"]).replace("-cli.exe", ".exe"))
+
+
 def plan_app(slug: str, spec: dict, entry: dict, overrides: dict,
              logdir: Path) -> dict:
-    app_exe = Path(str(spec["cli"]).replace("-cli.exe", ".exe"))
+    app_exe = app_exe_of(spec)
     port = int(overrides.get(slug, entry["port"]))
     launch = [str(app_exe), "--control", str(port)]
     token_file = entry["token_file"] or str(Path.home() / ".craft-bridge" / f"{slug}.token")
@@ -173,6 +273,7 @@ def plan_app(slug: str, spec: dict, entry: dict, overrides: dict,
     return {
         "slug": slug,
         "app": str(app_exe),
+        "app_source": str(spec.get("cli_source") or "tabella"),
         "port": port,
         "port_matches_config": port == entry["port"],
         "config_port": entry["port"],
@@ -277,9 +378,12 @@ def main() -> int:
     table = app_table()
     try:
         entries = shim_entries(Path(args.config), table)
+        translated = translated_entries(Path(args.config))
     except (SystemExit, json.JSONDecodeError) as exc:
         print(f"config illeggibile: {exc}", file=sys.stderr)
         return 3
+    for slug, item in translated.items():
+        item["slug"] = slug
 
     overrides = {}
     for item in args.port:
@@ -287,6 +391,10 @@ def main() -> int:
             print(f"--port vuole slug=porta, ricevuto: {item}", file=sys.stderr)
             return 2
         slug, port = item.split("=", 1)
+        if slug in translated:
+            print(f"{slug} non ha una porta da impostare: la sceglie l'app e la scrive "
+                  f"nel file di controllo ({translated[slug].get('control')})", file=sys.stderr)
+            return 2
         if slug not in table:
             print(f"slug sconosciuto in --port: {slug}", file=sys.stderr)
             return 2
@@ -294,35 +402,62 @@ def main() -> int:
 
     if args.list:
         rows = []
+        for slug, item in sorted(translated.items()):
+            state = translator_state(item)
+            rows.append({
+                "slug": slug, "transport": "traduttore", "mode": state.get("mode"),
+                "port": state.get("port"), "pid": state.get("pid"),
+                "mode_why": state.get("mode_why"),
+                "app": str(app_executable(item)),
+                "app_running": process_running(Path(str(app_executable(item))).name),
+            })
         for slug, spec in sorted(table.items()):
             entry = entries.get(slug)
             port = int(overrides.get(slug, (entry or {}).get("port", spec["port"])))
             rows.append({
                 "slug": slug, "port": port, "bridged_in_config": entry is not None,
                 "channel": port_open(port),
-                "app_running": process_running(Path(str(spec["cli"])).name.replace("-cli", "")),
+                "app": str(app_exe_of(spec)),
+                "app_source": str(spec.get("cli_source") or "tabella"),
+                "app_running": process_running(app_exe_of(spec).name),
             })
         if args.json:
             print(json.dumps(rows, indent=2))
         else:
-            print(f"{'slug':<12}{'porta':>6}  {'entry shim':<11}{'porta':<10}app aperta"
-                  "  (per sapere *chi* ascolta: craft-bridge-ident.py --all)")
-            for r in rows:
-                print(f"{r['slug']:<12}{r['port']:>6}  "
-                      f"{'si' if r['bridged_in_config'] else 'NO':<11}"
-                      f"{'in ascolto' if r['channel'] else 'chiusa':<10}"
-                      f"{'si' if r['app_running'] else 'no'}")
+            translated_rows = [x for x in rows if x.get("transport") == "traduttore"]
+            if translated_rows:
+                # Intestazione propria: le colonne non sono quelle della tabella shim
+                # (qui la porta la sceglie l'app, e il modo lo dice il traduttore).
+                print(f"{'slug':<12}{'porta':>6}  {'trasporto':<11}{'modo':<10}"
+                      "app aperta  perche'")
+                for r in translated_rows:
+                    print(f"{r['slug']:<12}{str(r.get('port') or '-'):>6}  {'traduttore':<11}"
+                          f"{str(r.get('mode') or '?'):<10}"
+                          f"{'si' if r['app_running'] else 'no':<12}{r.get('mode_why') or ''}")
+            shim_rows = [x for x in rows if x.get("transport") != "traduttore"]
+            if shim_rows:
+                print(f"{'slug':<12}{'porta':>6}  {'entry shim':<11}{'canale':<10}"
+                      "app aperta  percorso")
+                for r in shim_rows:
+                    print(f"{r['slug']:<12}{r['port']:>6}  "
+                          f"{'si' if r['bridged_in_config'] else 'NO':<11}"
+                          f"{'in ascolto' if r['channel'] else 'chiusa':<10}"
+                          f"{'si' if r['app_running'] else 'no':<12}{r['app_source']}")
+                print("(per sapere *chi* ascolta: craft-bridge-ident.py --all)")
         return 0
 
+    known = sorted(set(table) | set(translated))
     if args.apps:
-        wanted = [s.strip() for s in args.apps.split(",") if s.strip()]
+        asked = [s.strip() for s in args.apps.split(",") if s.strip()]
     else:
-        wanted = sorted(entries)
-    unknown = [s for s in wanted if s not in table]
+        asked = sorted(set(entries) | set(translated))
+    unknown = [s for s in asked if s not in known]
     if unknown:
-        print(f"slug sconosciuto: {', '.join(unknown)} (noti: {', '.join(sorted(table))})",
+        print(f"slug sconosciuto: {', '.join(unknown)} (noti: {', '.join(known)})",
               file=sys.stderr)
         return 2
+    wanted = [s for s in asked if s in table]
+    wanted_t = [s for s in asked if s in translated]
 
     logdir = LOGDIR
     missing_entry = [s for s in wanted if s not in entries]
@@ -362,7 +497,8 @@ def main() -> int:
             item["pid"] = None
             if not item["already"] and not args.json:
                 print(f"=== {item['slug']} (porta {item['port']}) ===\n"
-                      f"  avvio      : {' '.join(item['launch'])}")
+                      f"  avvio      : {' '.join(item['launch'])}\n"
+                      f"  app        : da {item['app_source']}")
             continue
         if not item["exe_ok"]:
             item["pid"] = None
@@ -374,8 +510,40 @@ def main() -> int:
                   f"  avvio      : {' '.join(item['launch'])}\n"
                   f"  pid        : {item['pid']}  | log: {item['log']}")
 
+    # 1b) Le app del traduttore: un altro trasporto, quindi un altro piano.
+    plan_t: list[dict] = []
+    for slug in wanted_t:
+        item = dict(translated[slug])
+        item["slug"] = slug
+        item["transport"] = "traduttore"
+        item["app"] = app_executable(item)
+        item["log"] = logdir / f"{slug}.log"
+        item["launch"] = [item["app"], "--control", str(item["control"])]
+        state = translator_state(item)
+        item["mode_before"] = state.get("mode")
+        item["already"] = state.get("mode") == "bridged"
+        item["exe_ok"] = bool(item["app"]) and Path(item["app"]).is_file()
+        item["port"] = state.get("port")
+        plan_t.append(item)
+        if item["already"] or args.dry_run:
+            item["pid"] = None
+            if not args.json:
+                print(f"=== {item['slug']} (traduttore) ===\n"
+                      f"  avvio      : {' '.join(item['launch'])}\n"
+                      f"  stato      : {state.get('mode')} ({state.get('mode_why')})")
+            continue
+        if not item["exe_ok"]:
+            item["pid"] = None
+            item["error"] = f"eseguibile assente: {item['app']}"
+            continue
+        item["pid"] = spawn(item)
+        if not args.json:
+            print(f"=== {item['slug']} (traduttore) ===\n"
+                  f"  avvio      : {' '.join(item['launch'])}\n"
+                  f"  pid        : {item['pid']}  | log: {item['log']}")
+
     if args.dry_run:
-        print(f"\n(dry-run: {len(plan)} app, nessuna avviata)")
+        print(f"\n(dry-run: {len(plan) + len(plan_t)} app, nessuna avviata)")
         return 0
 
     # 2) Attesa unica, in parallelo: le app partono insieme, non in fila.
@@ -527,25 +695,71 @@ def main() -> int:
                 print("  nota       : l'app non annuncia l'ascolto nel suo log, quindi la porta da "
                       "sola non dice chi ascolta; con --verify si interroga lo shim in bridged")
 
+    # 4) Le app del traduttore: si aspetta la porta **scritta nel file**, poi si chiede
+    # al traduttore la conferma (autenticata): la porta da sola non dice chi risponde.
+    active_t = 0
+    for item in plan_t:
+        if not item.get("already") and not item.get("error"):
+            deadline_t = time.time() + args.wait
+            port = control_port(item.get("control"))
+            while time.time() < deadline_t and not (port and port_open(port)):
+                time.sleep(POLL)
+                port = control_port(item.get("control"))
+            item["wait_port"] = port
+        state = translator_state(item) if not item.get("error") else {"mode": "?"}
+        item["mode_after"] = state.get("mode")
+        item["mode_why"] = state.get("mode_why")
+        item["port"] = state.get("port") or item.get("port")
+        item["pid_remote"] = state.get("pid")
+        item["window"] = state.get("window")
+        item["drift"] = state.get("drift")
+        item["active"] = item["mode_after"] == "bridged"
+        if item["active"]:
+            active_t += 1
+        if args.json:
+            continue
+        if item.get("error"):
+            print(f"  esito      : {item['error']}")
+            continue
+        print(f"  canale     : {'attivo' if item['active'] else 'NON attivo'}"
+              f" (traduttore: {item['mode_after']}, porta {item.get('port')})")
+        if item.get("window"):
+            w = item["window"]
+            print(f"  finestra   : {w.get('width')}x{w.get('height')} punti (pid {item['pid_remote']})")
+        drift_t = item.get("drift") or {}
+        if drift_t.get("checked"):
+            print(f"  catalogo   : {drift_t.get('ours')} metodi"
+                  + (" , gli stessi che dichiara l'app" if drift_t.get("same")
+                     else f" , l'app ne dichiara {drift_t.get('theirs')}"))
+        if not item["active"]:
+            print(f"  diagnosi   : la finestra non risponde ({item.get('mode_why')}); "
+                  f"l'entry resta valida e va headless. La causa sta in coda al log:")
+            for line in tail_lines(item["log"], 4):
+                print(f"    | {ascii_safe(line)[:200]}")
+
     report = {
         "config": str(Path(args.config)),
-        "requested": wanted,
-        "active": active,
-        "apps": {i["slug"]: {k: (str(v) if isinstance(v, Path) else v)
-                             for k, v in i.items() if k != "entry"} for i in plan},
-        "ok": active == len(plan),
+        "requested": asked,
+        "active": active + active_t,
+        "apps": {**{i["slug"]: {k: (str(v) if isinstance(v, Path) else v)
+                                 for k, v in i.items() if k != "entry"} for i in plan},
+                 **{i["slug"]: {k: (str(v) if isinstance(v, Path) else v)
+                                for k, v in i.items() if k != "entry"} for i in plan_t}},
+        "ok": (active + active_t) == (len(plan) + len(plan_t)),
     }
+    total = len(plan) + len(plan_t)
     if args.json:
         print(json.dumps(report, indent=2))
     else:
         drift = [i["slug"] for i in plan if i.get("build_drift")]
-        print(f"\n{active}/{len(plan)} app col canale di controllo attivo"
+        print(f"\n{active + active_t}/{total} app col canale di controllo attivo"
               f"{' (in bridged verificato)' if args.verify else ''}"
               + (f" · {len(drift)} con un'altra build ({', '.join(drift)})" if drift else ""))
         print("in Freebuff: Connectors -> Refresh, poi usa l'app normalmente")
         if not args.verify and any(i["channel"] and not i["confirmed"] for i in plan):
             print("riprova con --verify per la prova end-to-end attraverso lo shim")
-    return 0 if active == len(plan) and not any(i.get("build_drift") for i in plan) else 1
+    return 0 if (active + active_t) == total and not any(i.get("build_drift")
+                                                        for i in plan) else 1
 
 
 if __name__ == "__main__":

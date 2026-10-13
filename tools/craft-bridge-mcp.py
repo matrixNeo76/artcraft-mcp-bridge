@@ -61,6 +61,7 @@ risponde sulla porta.
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
 import json
 import os
 import re
@@ -97,6 +98,203 @@ APPS: dict[str, dict] = {
     "wordcraft":   {"cli": r"C:\Program Files\WordCraft\wordcraft-cli.exe",
                     "flag": "--connect", "addr": "127.0.0.1:{port}", "port": 7978},
 }
+
+# ---------------------------------------------------------------------------------
+# Dove sta davvero l'app
+# ---------------------------------------------------------------------------------
+#
+# I percorsi qui sopra sono quelli che ci **ricordiamo**. Windows registra quelli
+# veri: aprendo un'app per nome, l'interfaccia di sistema legge `App Paths`, e quelle
+# voci le scrive l'installer dell'app — quindi le aggiorna chi reinstalla, non noi. La
+# tabella resta come ultima risorsa, ma la fonte dei percorsi e' il sistema, e quando
+# i due non coincidono la differenza si vede invece di restare sotto un percorso
+# scritto a mano che nessuno controlla piu'.
+#
+# Del **launcher** di ArtCraft qui non si usa niente per avviare: non ha un modo da
+# riga di comando per farlo (l'unico flag accettato e' `--hidden`, nessuno schema URL,
+# e le issue del progetto lo chiedono come funzione mancante). Il launcher sa quali
+# release **esistono** — quel lato lo legge `craft-bridge-feed.py` — non dove sono
+# installate. E' pero' lui a mostrare che in questo ecosistema le installazioni
+# per-utente esistono: il launcher si registra in `HKCU`, non in `HKLM`.
+APP_PATHS = r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths"
+
+
+# I nomi dei file di ogni app, in un posto solo: la CLI e l'app hanno lo stesso nome
+# di base, e questo vale per tutte e undici (verificato).
+def cli_beside(app_exe: str) -> Path:
+    return Path(app_exe).with_name(Path(app_exe).stem + "-cli.exe")
+
+
+def registered_exe(slug: str) -> tuple[str | None, str | None]:
+    """Cosa il **sistema** registra per quell'app: `(percorso, hive)`, o `(None, None)`.
+
+    `winreg` e non PowerShell: questo codice gira all'avvio di ogni sessione MCP, e
+    una lettura del registro costa millisecondi mentre un processo in piu' costerebbe
+    quanto l'handshake. Si provano le due viste (64 e 32 bit: l'app puo' essere
+    registrata nell'una o nell'altra) e **i due hive**, utente prima di macchina:
+    un'app installata "solo per me" finisce in `HKCU`, una per tutti in `HKLM`, e
+    questo e' l'ordine con cui Windows risolve il nome di un programma. Il launcher
+    stesso sta in `HKCU` — guardare solo `HKLM` renderebbe invisibile
+    un'installazione per-utente, cioe' di nuovo un percorso vecchio al posto di quello
+    vero. `hive` dice da dove viene, cosi' il fatto si vede invece di restare implicito.
+    """
+    if os.name != "nt":
+        return None, None
+    try:
+        import winreg
+    except ImportError:
+        return None, None
+    hives = (("utente", winreg.HKEY_CURRENT_USER), ("macchina", winreg.HKEY_LOCAL_MACHINE))
+    for hive_name, hive in hives:
+        for view in (winreg.KEY_WOW64_64KEY, winreg.KEY_WOW64_32KEY):
+            try:
+                with winreg.OpenKey(hive, f"{APP_PATHS}\\{slug}.exe", 0,
+                                    winreg.KEY_READ | view) as key:
+                    value, _ = winreg.QueryValueEx(key, "")     # valore predefinito
+            except OSError:
+                continue
+            if value:
+                return str(value), hive_name
+    return None, None
+
+
+def choose_cli(registered: str | None, declared: str,
+               hive: str | None = None) -> tuple[str, str]:
+    """Quale CLI usare e da dove viene. Funzione pura: si prova senza toccare il registro.
+
+    Tre esiti, in ordine di fiducia: la CLI che sta **accanto all'app che il sistema
+    registra** (e l'esito dice anche da quale hive viene), la CLI dichiarata qui,
+    oppure la dichiarata **assente** — che e' una informazione, non un silenzio: chi
+    legge sa che quel percorso non esiste.
+    """
+    if registered:
+        beside = cli_beside(registered)
+        if beside.is_file():
+            return str(beside), (f"registro App Paths ({hive})" if hive
+                                 else "registro App Paths")
+    if Path(declared).is_file():
+        return declared, "tabella"
+    return declared, "tabella (assente sul disco)"
+
+
+_RESOLVED: dict | None = None
+
+
+def app_table() -> dict:
+    """La tabella con i percorsi risolti: la usano lo shim, l'installer e la diagnosi.
+
+    Oltre a `cli` (quello da usare) restano visibili `cli_source` (da dove viene),
+    `declared_cli` (cosa dicevamo noi) e `app_exe` (cosa dice il sistema): senza questi
+    tre campi uno scostamento fra tabella e sistema sarebbe invisibile, che e' il modo
+    in cui un percorso cablato invecchia senza che nessuno se ne accorga.
+    """
+    global _RESOLVED
+    if _RESOLVED is None:
+        _RESOLVED = {}
+        for slug, spec in APPS.items():
+            app, hive = registered_exe(slug)
+            cli, source = choose_cli(app, spec["cli"], hive)
+            _RESOLVED[slug] = {**spec, "cli": cli, "cli_source": source,
+                               "declared_cli": spec["cli"], "app_exe": app,
+                               "app_hive": hive}
+    return _RESOLVED
+
+
+# ---------------------------------------------------------------------------------
+# Il flag di aggancio: quello che la tabella dichiara, e quello che la CLI dice di se'
+# ---------------------------------------------------------------------------------
+#
+# La tabella dice **quale flag** serve per guidare la finestra (`--connect` o
+# `--bridge`), e per le app servite dal traduttore dice che un flag non c'e' affatto.
+# E' una dichiarazione, e invecchia come tutte: un'app aggiornata che rinomina o toglie
+# l'opzione lascerebbe la tabella a promettere qualcosa che non esiste, e il guasto
+# arriverebbe all'avvio del connettore, lontano da qui. Quindi la stessa domanda si fa
+# alla CLI, nel suo help: e' **la sua** interfaccia, non la nostra memoria.
+
+BRIDGE_FLAGS = ("--connect", "--bridge")
+
+
+def cli_help(cli: str, timeout: float = 20.0) -> dict:
+    """L'help che la CLI da' di se stessa. Vuoto = non leggibile, e lo dice."""
+    if not Path(cli).is_file():
+        return {"readable": False, "why": f"CLI assente sul disco: {cli}", "text": ""}
+    try:
+        proc = subprocess.run([cli, "--help"], capture_output=True, text=True,
+                              encoding="utf-8", errors="replace", timeout=timeout)
+    except (OSError, subprocess.SubprocessError) as exc:
+        return {"readable": False, "why": f"help non leggibile: {exc}", "text": ""}
+    text = ((proc.stdout or "") + (proc.stderr or "")).strip()
+    if not text:
+        return {"readable": False, "why": f"help vuoto (uscita {proc.returncode})",
+                "text": ""}
+    return {"readable": True, "text": text, "exit": proc.returncode}
+
+
+def flag_facts(slug: str, spec: dict, timeout: float = 20.0) -> dict:
+    """Il flag della tabella contro quello che l'help della CLI documenta.
+
+    Tre esiti per le app con un flag dichiarato (`--connect`/`--bridge`): `ok` se
+    l'help lo nomina, `diverge` se non lo nomina — la tabella afferma un'opzione che la
+    CLI non documenta — e `non leggibile` se la CLI non da' un help, che e' una lacuna
+    dichiarata, non un ok. Per le app **senza** flag (quelle del traduttore) la domanda
+    si rovescia: l'help non deve nominare `--connect`/`--bridge`, e deve documentare il
+    canale che si usa invece (`--control`).
+    """
+    help_ = cli_help(str(spec.get("cli") or ""), timeout)
+    text = help_.get("text", "")
+    seen = [f for f in BRIDGE_FLAGS if f in text]
+    declared = spec.get("flag")
+    control = spec.get("control_flag")
+    row = {"check": slug, "declared": declared, "cli": str(spec.get("cli") or ""),
+           "translated": bool(spec.get("translated")), "documents": seen,
+           "why": help_.get("why", "")}
+    if not help_["readable"]:
+        row.update(state="non leggibile",
+                   detail=f"la CLI non da' un help ({help_['why']}): il flag resta una "
+                          f"dichiarazione della tabella")
+        return row
+    if declared:
+        if declared in text:
+            row.update(state="ok", detail=f"l'help della CLI documenta `{declared}`")
+        else:
+            extra = f" (nomina {', '.join(seen)})" if seen else " (non ne nomina nessuno)"
+            row.update(state="diverge",
+                       detail=f"la tabella dichiara `{declared}`, l'help non lo nomina{extra}")
+        return row
+    if seen:
+        row.update(state="diverge",
+                   detail=f"la tabella non usa un flag di aggancio, ma l'help nomina "
+                          f"{', '.join(seen)}: la CLI sa agganciarsi")
+        return row
+    if control and control not in text:
+        row.update(state="non leggibile",
+                   detail=f"l'help non nomina ne' {', '.join(BRIDGE_FLAGS)} ne' "
+                          f"`{control}`: non si sa come si guidi questa CLI")
+        return row
+    row.update(state="ok",
+               detail=(f"l'help non ha {', '.join(BRIDGE_FLAGS)} e documenta `{control}`: "
+                       f"si guida per traduzione" if control else
+                       f"l'help non ha {', '.join(BRIDGE_FLAGS)}"))
+    return row
+
+
+def flag_report(apps: dict | None = None, timeout: float = 20.0) -> dict:
+    """Il verdetto su tutte le app: quante confermate, quali no, quali non leggibili.
+
+    Gli help si chiedono **in parallelo**: sono processi indipendenti e brevi (~0,06 s
+    l'uno), e in fila facevano ~0,8 s a ogni giro del doctor. L'ordine dei risultati
+    resta quello della tabella.
+    """
+    table = apps if apps is not None else app_table()
+    slugs = sorted(table)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(8, len(slugs) or 1)) as pool:
+        rows = list(pool.map(lambda s: flag_facts(s, table[s], timeout), slugs))
+    return {"rows": rows,
+            "ok": [r["check"] for r in rows if r["state"] == "ok"],
+            "diverging": [r["check"] for r in rows if r["state"] == "diverge"],
+            "unreadable": [r["check"] for r in rows if r["state"] == "non leggibile"],
+            "total": len(rows)}
+
 
 HERE = Path(__file__).resolve().parent
 BUILD_TOOL = HERE / "craft-bridge-ident.py"
@@ -328,21 +526,42 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--slug", choices=sorted(APPS))
     parser.add_argument("--dump-apps", action="store_true",
-                        help="stampa la tabella delle app in JSON ed esce")
+                        help="stampa la tabella delle app in JSON ed esce (percorsi "
+                             "risolti dal sistema, con la fonte e il dichiarato)")
     parser.add_argument("--port", type=int, help="porta del canale di controllo")
     parser.add_argument("--token-file", help="control-token file (PhotoCraft)")
     parser.add_argument("--host", default="127.0.0.1", help="host della sonda")
     parser.add_argument("--require-bridge", action="store_true")
+    parser.add_argument("--flags", action="store_true",
+                        help="confronta il flag di aggancio della tabella con quello che "
+                             "l'help di ogni CLI dichiara, ed esce")
+    parser.add_argument("--flag-timeout", type=float, default=20.0,
+                        help="secondi per l'help di una CLI (default 20)")
+    parser.add_argument("--json", action="store_true", help="uscita JSON")
     args = parser.parse_args()
 
     if args.dump_apps:
-        import json
-        print(json.dumps(APPS, indent=2))
+        print(json.dumps(app_table(), indent=2))
         return 0
+    if args.flags:
+        report = flag_report(timeout=args.flag_timeout)
+        if args.json:
+            print(json.dumps(report, indent=2, ensure_ascii=False))
+            return 1 if report["diverging"] else 0
+        marks = {"ok": "ok  ", "diverge": "FIX ", "non leggibile": "n/d "}
+        for row in report["rows"]:
+            print(f"  {marks[row['state']]} {row['check']:<12} {row['detail']}")
+        tail = f"{len(report['ok'])}/{report['total']} confermati dall'help della CLI"
+        if report["diverging"]:
+            tail += f", {len(report['diverging'])} divergenti ({', '.join(report['diverging'])})"
+        if report["unreadable"]:
+            tail += f", {len(report['unreadable'])} non leggibili"
+        print(tail)
+        return 1 if report["diverging"] else 0
     if not args.slug:
         parser.error("--slug e' obbligatorio (oppure usa --dump-apps)")
 
-    spec = APPS[args.slug]
+    spec = app_table()[args.slug]
     cli = Path(spec["cli"])
     port = args.port or spec["port"]
 

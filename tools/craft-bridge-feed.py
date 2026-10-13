@@ -608,7 +608,10 @@ def main() -> int:
     args = parser.parse_args()
 
     try:
-        table = CONFIG.apps_table()
+        # Le app **servite dal ponte**: quelle dello shim piu' quella del traduttore.
+        # PdfCraft non ha un canale su porta nota, ma il ponte la serve, quindi la
+        # domanda "e' la release pubblicata?" vale anche per lei.
+        table = CONFIG.bridge_table()
     except SystemExit as exc:
         print(f"tabella delle app illeggibile: {exc}", file=sys.stderr)
         return 3
