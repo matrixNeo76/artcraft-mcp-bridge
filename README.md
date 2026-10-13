@@ -56,7 +56,8 @@ Ripristino headless: `python tools/craft-bridge-config.py --restore`.
 |---|---|
 | App guidabili in bridged, con una chiamata riuscita sulla finestra | 11 su 12 (PdfCraft: MCP senza ponte) |
 | Entry della config eseguite col comando reale | 13/13 |
-| Suite di guasti (10 casi, guasti iniettati) | 10/10, due giri di fila identici |
+| Suite di guasti (13 casi, guasti iniettati) | 13/13, due giri di fila identici |
+| Installata contro la release pubblicata dal launcher | 11 su 11 allineate (feed del 13 ottobre) |
 | Inventario tool dei server | 13/13 server, 764 tool |
 | Diagnosi complessiva | `tutto in ordine` |
 
@@ -68,11 +69,22 @@ operazioni, difetti trovati). Il testo lungo e completo, con tutte le misure, è
 [docs/reference/craft-bridge.md](docs/reference/craft-bridge.md).
 
 ```bash
-uvx okfgen validate docs --strict                      # conforme: 29 concetti, 0 errori
+uvx okfgen validate docs --strict                      # conforme: 30 concetti, 0 errori
 uvx okfgen visualize docs -o reports/okf-graph.html    # grafo interattivo del bundle
 ```
 
-Il grafo generato è in [reports/okf-graph.html](reports/okf-graph.html): 29 nodi, 114 relazioni.
+Il grafo generato è in [reports/okf-graph.html](reports/okf-graph.html): 30 nodi, 120 relazioni.
+
+## Cos'e' installato, contro cosa e' pubblicato
+
+La versione di un eseguibile dice cosa dichiara di essere, non se e' la release che il
+fornitore distribuisce. Il launcher di ArtCraft tiene sul disco l'elenco che usa per
+aggiornare le app (repository, ultima release, pacchetti con il loro `sha256`):
+[craft-bridge-feed.py](tools/craft-bridge-feed.py) mette quell'elenco accanto alla build
+installata e dice dove le due cose non coincidono — con `--downloads` confronta anche i
+byte dei pacchetti già scaricati. Dentro `doctor` è una `nota`, non un `FIX`: il ponte
+funziona anche con la versione precedente. Dettagli in
+[docs/tools/craft-bridge-feed.md](docs/tools/craft-bridge-feed.md).
 
 ## Controlli automatici
 

@@ -16,6 +16,8 @@ o `craft-bridge-launch.py`, pretende l'esito giusto e poi rimette a posto.
     altra app sulla porta         doctor / ident               FIX + identity mismatch
     credenziale rifiutata         doctor / ident               FIX + auth rifiutata
     porta chiusa                  ident / shim                 unreachable / headless
+    installata != pubblicata      feed / doctor                scostamento / nota
+    feed assente o illeggibile    feed                         uscita 3 (non un guasto)
 
 Regole di sicurezza, applicate sempre:
 
@@ -91,6 +93,7 @@ def _load(name: str, filename: str):
 DOC = _load("craft_bridge_doctor", "craft-bridge-doctor.py")
 IDENT = DOC.IDENT
 CONFIG = DOC.CONFIG
+FEED = DOC.FEED
 
 
 # ---------------------------------------------------------------------------------
@@ -284,6 +287,104 @@ def t_missing_exe(run: Runner) -> tuple[str, str]:
     return "PASS", detail.split("mancano:")[-1].strip()
 
 
+@case("confronto col feed del launcher", "unit")
+def t_feed_compare(run: Runner) -> tuple[str, str]:
+    """Il confronto installata/pubblicata, con un feed finto: niente rete, niente app."""
+    body = b"pacchetto di prova\n"
+    digest = hashlib.sha256(body).hexdigest()
+    other = hashlib.sha256(b"altri byte\n").hexdigest()
+    table = {"alpha": {"cli": "alpha.exe"}, "beta": {"cli": "beta.exe"},
+             "delta": {"cli": "delta.exe"}}
+    feed = {"dir": "prova", "fetched_at": None, "releases": {},
+            "apps": {
+                "alpha": {"name": "Alpha", "repo": "storytold/alpha", "version": "2.0.0",
+                          "assets": [
+                              {"name": "alpha-2.0.0-windows-x64.msi", "sha256": digest,
+                               "platform": {"os": "windows", "arch": "x64",
+                                            "package_type": "msi"}},
+                              {"name": "alpha-2.0.0-altro.zip", "sha256": other,
+                               "platform": {"os": "windows", "arch": "x64",
+                                            "package_type": "portable_zip"}}]},
+                "beta": {"name": "Beta", "repo": "storytold/beta", "version": "1.0.0",
+                         "assets": []},
+                "epsilon": {"name": "Epsilon", "repo": "storytold/epsilon",
+                            "version": "3.0.0", "assets": []}}}
+    installed = {"alpha": {"version": "1.0.0", "source": "prova"},
+                 "beta": {"version": "1.0.0.0", "source": "prova"},
+                 "delta": {"version": None, "source": "prova"}}
+    downloads = run.tmp / "downloads"
+    downloads.mkdir()
+    (downloads / "alpha-2.0.0-windows-x64.msi").write_bytes(body)      # come pubblicato
+    (downloads / "alpha-2.0.0-altro.zip").write_bytes(body)            # byte diversi
+    (downloads / "estraneo.zip").write_bytes(b"x")                    # non e' nel feed
+
+    rows = FEED.rows(table, feed, installed, downloads_dir=downloads, packages=True,
+                     system="windows", machine="x64")
+    by = {row["check"]: row for row in rows}
+    problems = []
+    def want(condition: bool, why: str) -> None:
+        if not condition:
+            problems.append(why)
+
+    want(by["alpha"]["kind"] == "behind" and by["alpha"]["state"] == "nota",
+         f"alpha dietro non accusata: {by['alpha']}")
+    want(by["beta"]["kind"] == "same", f"1.0.0.0 e 1.0.0 dovrebbero coincidere: {by['beta']}")
+    want(by["delta"]["kind"] == "absent", f"app fuori dal feed non segnalata: {by['delta']}")
+    want("epsilon" in by["fuori dal ponte"]["detail"], "app del feed fuori dal ponte non elencata")
+    want("alpha-2.0.0-windows-x64.msi (installer MSI" in by["pacchetto alpha"]["detail"],
+         f"pacchetto di questo sistema non indicato: {by['pacchetto alpha']['detail']}")
+    want(by["download alpha-2.0.0-windows-x64.msi"]["state"] == "ok",
+         "i byte giusti non sono stati riconosciuti")
+    want(by["download alpha-2.0.0-altro.zip"]["state"] == "fail",
+         "i byte diversi non sono stati accusati")
+    want(by["download estraneo.zip"]["state"] == "nota",
+         "un file fuori dal feed non deve diventare un guasto")
+    want(FEED.compare("0.8.2.0", "0.8.2") == "same", "le code di zeri non sono pareggiate")
+    want(FEED.compare(None, "1.0.0") == "unknown", "senza versione installata si deve dire unknown")
+    if problems:
+        return "FAIL", "; ".join(problems)[:200]
+    return "PASS", (f"{len(rows)} righe: dietro, pari, assente, estraneo e i tre casi "
+                     f"di byte")
+
+
+@case("feed assente non e' un guasto", "unit")
+def t_feed_missing(run: Runner) -> tuple[str, str]:
+    """Senza launcher non c'e' un termine di paragone, ma il ponte non e' rotto."""
+    rows = DOC.check_published(CONFIG.apps_table(), run.tmp / "nessun-feed")
+    if rows[0]["state"] != "nota":
+        return "FAIL", f"atteso nota, ottenuto {rows[0]['state']}: {rows[0]['detail']}"
+    if "feed assente" not in rows[0]["detail"]:
+        return "FAIL", f"la nota non dice perche': {rows[0]['detail']}"
+    return "PASS", "doctor: nota con la ragione, non un FIX"
+
+
+@case("feed illeggibile o estraneo", "static")
+def t_feed_files(run: Runner) -> tuple[str, str]:
+    """Un feed che non c'e' o non si legge ha un esito suo: 3, non un guasto del ponte."""
+    tool = HERE / "craft-bridge-feed.py"
+    empty = run.tmp / "feed-vuoto"
+    empty.mkdir()
+    code, out, err = run.run(str(tool), "--feed-dir", str(empty))
+    if code != 3 or "feed assente" not in out + err:
+        return "FAIL", f"cartella senza feed: uscita {code} (attesa 3)"
+    broken = run.tmp / "feed-rotto"
+    broken.mkdir()
+    (broken / "feed.json").write_text("{non e' json", encoding="utf-8")
+    code, out, err = run.run(str(tool), "--feed-dir", str(broken))
+    if code != 3 or "illeggibile" not in out + err:
+        return "FAIL", f"feed illeggibile: uscita {code} (attesa 3)"
+    alien = run.tmp / "feed-estraneo"
+    alien.mkdir()
+    (alien / "feed.json").write_text(json.dumps({"release_info": {
+        "apps": {"epsilon": {"name": "Epsilon", "repo": "storytold/epsilon",
+                              "latest_release": {"version": "3.0.0", "assets": []}}}}}),
+        encoding="utf-8")
+    code, out, _ = run.run(str(tool), "--feed-dir", str(alien))
+    if code != 0 or "fuori dal ponte" not in out:
+        return "FAIL", f"feed estraneo: uscita {code} (attesa 0): {out.strip()[:120]}"
+    return "PASS", "assente 3, illeggibile 3, estraneo 0 (nessun guasto inventato)"
+
+
 @case("porta chiusa", "live", env=True)
 def t_closed_port(run: Runner) -> tuple[str, str]:
     table = CONFIG.apps_table()
@@ -418,13 +519,14 @@ def t_bad_token(run: Runner) -> tuple[str, str]:
     return "PASS", "token diverso: accusato da doctor e ident (valore mai stampato)"
 
 
-ALL = [t_clean, t_stale_install, t_bad_entry, t_broken_path, t_missing_exe, t_closed_port,
+ALL = [t_clean, t_stale_install, t_bad_entry, t_broken_path, t_missing_exe,
+       t_feed_compare, t_feed_missing, t_feed_files, t_closed_port,
        t_good_build, t_drift_build, t_wrong_app, t_bad_token]
 
 # Gli strumenti che la suite verifica: le loro impronte finiscono nel report, cosi'
 # due esecuzioni a distanza si confrontano anche su *cosa* e' cambiato.
 FINGERPRINTED = ("craft-bridge-mcp.py", "craft-bridge-ident.py", "craft-bridge-doctor.py",
-                 "craft-bridge-config.py", "craft-bridge-tests.py")
+                 "craft-bridge-config.py", "craft-bridge-feed.py", "craft-bridge-tests.py")
 
 
 def tool_hashes() -> dict:

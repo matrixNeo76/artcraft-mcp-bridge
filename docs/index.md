@@ -26,6 +26,7 @@ generati stanno fuori dal bundle, in `tools/`, `install/`, `reports/`.
 * [craft-bridge-mcp](tools/craft-bridge-mcp.md) - lo shim stdio che sceglie il modo
 * [craft-bridge-ident](tools/craft-bridge-ident.md) - chi risponde sulla porta e quale build
 * [craft-bridge-doctor](tools/craft-bridge-doctor.md) - un verdetto solo su tutto l'assieme
+* [craft-bridge-feed](tools/craft-bridge-feed.md) - cosa il fornitore pubblica, contro cosa e' installato
 * [craft-bridge-config](tools/craft-bridge-config.md) - installer idempotente di copie ed entry
 * [craft-bridge-launch](tools/craft-bridge-launch.md) - avvia una o piu' app col canale attivo
 * [craft-bridge-verify](tools/craft-bridge-verify.md) - interroga ogni entry col suo comando reale

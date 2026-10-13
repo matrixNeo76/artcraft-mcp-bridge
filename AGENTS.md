@@ -13,7 +13,7 @@ strumento dichiara cosa ha provato, e quando non lo sa lo dice.
 
 | Percorso | Contenuto |
 |---|---|
-| `tools/` | gli strumenti Python (13 file). Si eseguono da qui, funzionano da qualunque cartella |
+| `tools/` | gli strumenti Python (14 file). Si eseguono da qui, funzionano da qualunque cartella |
 | `install/` | `install-craft-mcp.ps1`, registrazione multi-client dell'MCP generativo |
 | `reports/` | artefatti generati; è il default di output degli strumenti, non la cartella da cui li invochi |
 | `docs/` | documentazione in **OKF v0.2** (bundle: `docs/index.md`) |
@@ -42,6 +42,7 @@ strumento dichiara cosa ha provato, e quando non lo sa lo dice.
 python -m py_compile tools/*.py              # sintassi di tutti gli strumenti
 python tools/craft-bridge-doctor.py          # un verdetto sull'assieme (exit 0 = niente da fare)
 python tools/craft-bridge-tests.py --static  # ~10 s, i casi che non avviano app
+python tools/craft-bridge-feed.py            # l'installato contro il pubblicato (se c'e' il launcher)
 python tools/craft-bridge-tests.py           # ~44 s, compresi i casi con app vere
 ```
 

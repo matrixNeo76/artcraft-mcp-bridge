@@ -6,8 +6,11 @@ suo strumento: lo shim installato deve essere quello del repo (altrimenti i clie
 eseguono codice vecchio), le entry di `~/.agents/mcp.json` devono essere quelle che
 l'installer scriverebbe (altrimenti un'app resta headless senza che nessuno lo dica),
 gli eseguibili devono esserci, e quello che *gira* sulla porta deve essere la build
-configurata (il catalogo identifica l'app, non la versione). Questo comando li
-interroga tutti e risponde in fondo con una riga sola:
+configurata (il catalogo identifica l'app, non la versione). A questi si aggiunge un
+confronto che non e' un guasto ma una informazione: quello che il launcher di ArtCraft
+**pubblica** per ogni app, contro quello che risulta installato (dal feed del launcher,
+letto da `craft-bridge-feed.py`). Questo comando li interroga tutti e risponde in fondo
+con una riga sola:
 
     VERDETTO: tutto in ordine (nessuna azione)
 
@@ -27,6 +30,7 @@ Uso:
     python craft-bridge-doctor.py                 # tutto, comprese le app aperte
     python craft-bridge-doctor.py --no-live       # solo repo, shim, config, eseguibili
     python craft-bridge-doctor.py --json
+    python craft-bridge-doctor.py --feed-dir <cartella>   # feed del launcher di prova
 
 Esito:
     0  niente da sistemare
@@ -58,9 +62,17 @@ def _load(name: str, filename: str):
 
 IDENT = _load("craft_bridge_ident", "craft-bridge-ident.py")
 CONFIG = _load("craft_bridge_config", "craft-bridge-config.py")
+# Il confronto con la release pubblicata e' un'informazione in piu': se lo strumento
+# che la legge non c'e', la diagnosi lo dice e continua, invece di morire.
+try:
+    FEED = _load("craft_bridge_feed", "craft-bridge-feed.py")
+except SystemExit as exc:
+    FEED = None
+    FEED_WHY = str(exc)
 
 # Cosa deve esserci nel repo perche' l'assieme funzioni.
-REQUIRED = ("craft-bridge-mcp.py", "craft-bridge-ident.py", "craft-bridge-config.py")
+REQUIRED = ("craft-bridge-mcp.py", "craft-bridge-ident.py", "craft-bridge-config.py",
+            "craft-bridge-feed.py")
 # Cosa deve esserci **installato** accanto allo shim: lo shim delega a ident la
 # domanda sulla build, quindi senza quel file il controllo non si puo' fare.
 INSTALLED = ("craft-bridge-mcp.py", "craft-bridge-ident.py")
@@ -155,7 +167,7 @@ def check_config(config_path: Path, table: dict, install_dir: Path,
     return out
 
 
-def check_apps(table: dict) -> list[dict]:
+def check_apps(table: dict, file_facts: dict | None = None) -> list[dict]:
     """Gli eseguibili che la config userebbe: CLI installata ed eseguibile dell'app."""
     missing = [f"{slug} cli" for slug, spec in table.items() if not Path(spec["cli"]).is_file()]
     missing += [f"{slug} app" for slug, spec in table.items()
@@ -163,19 +175,65 @@ def check_apps(table: dict) -> list[dict]:
     if missing:
         return [result("eseguibili", "fail", f"mancano: {', '.join(sorted(missing))}",
                        "installa l'app, o correggi la tabella in craft-bridge-mcp.py")]
-    versions = IDENT.file_versions([str(IDENT.configured_exe(s["cli"])) for s in table.values()])
+    versions = file_facts if file_facts is not None else \
+        IDENT.file_versions([str(IDENT.configured_exe(s["cli"])) for s in table.values()])
     listed = ", ".join(sorted({str(v.get("version") or "?") for v in versions.values()}))
     return [result("eseguibili", "ok",
                    f"{len(table)} CLI e {len(table)} app presenti (versioni: {listed})")]
 
 
-def check_live(table: dict, entries: dict) -> list[dict]:
+def check_published(table: dict, feed_dir: Path, file_facts: dict | None = None) -> list[dict]:
+    """La build installata contro quella che il fornitore ha **pubblicato**.
+
+    La versione di un eseguibile dice cosa dichiara di essere, non se e' la release
+    che il launcher distribuisce: sono due domande diverse, e finora il ponte ne
+    sapeva porre solo la prima. Il feed del launcher (`craft-bridge-feed.py`) porta
+    la seconda, con il repository di provenienza e lo sha256 dei pacchetti.
+
+    Un launcher assente **non** e' un guasto: senza feed non c'e' un termine di
+    paragone, e il ponte funziona lo stesso. Un'app indietro e' una nota, non un
+    guasto del ponte: si aggiorna dal launcher.
+    """
+    if FEED is None:
+        return [result("pubblicato", "nota", f"nessun confronto: manca lo strumento che "
+                                                    f"legge il feed ({FEED_WHY})", "")]
+    try:
+        feed = FEED.load(feed_dir)
+    except FEED.FeedError as exc:
+        return [result("pubblicato", "nota", f"nessun confronto: {exc}", "")]
+    facts = file_facts if file_facts is not None else \
+        IDENT.file_versions([str(IDENT.configured_exe(s["cli"])) for s in table.values()])
+    installed = {slug: {"version": build.get("version"), "source": build.get("source")}
+                 for slug, spec in table.items()
+                 for build in [IDENT.configured_build(slug, spec["cli"], file_facts=facts)]}
+    rows = FEED.rows(table, feed, installed)
+    behind = [r for r in rows if r.get("kind") == "behind"]
+    ahead = [r for r in rows if r.get("kind") == "ahead"]
+    unknown = [r for r in rows if r.get("kind") == "unknown"]
+    when = feed.get("fetched_at") or "?"
+    if behind or ahead:
+        listed = ", ".join(f"{r['check']} {r['detail'].split(' (')[0]}"
+                           for r in behind + ahead)
+        return [result("pubblicato", "nota",
+                       f"il launcher pubblica altro: {listed} (feed del {when})",
+                       "aggiorna dal launcher; poi `python craft-bridge-feed.py`")]
+    if unknown:
+        return [result("pubblicato", "nota",
+                       f"versione installata non leggibile per "
+                       f"{', '.join(r['check'] for r in unknown)} (feed del {when})",
+                       "avvia l'app dalla sua entry una volta")]
+    return [result("pubblicato", "ok",
+                   f"{len(table)} app allineate alla release pubblicata (feed del {when})")]
+
+
+def check_live(table: dict, entries: dict, file_facts: dict | None = None) -> list[dict]:
     """Chi c'e' davvero sulle porte: peer, app e build che gira."""
     ports = {slug: int((entries.get(slug) or {}).get("port") or table[slug]["port"])
              for slug in table}
     pids = IDENT.listening_pids(list(ports.values()))
     facts = IDENT.process_facts(sorted(set(pids.values())))
-    files = IDENT.file_versions([str(IDENT.configured_exe(table[s]["cli"])) for s in table])
+    files = file_facts if file_facts is not None else \
+        IDENT.file_versions([str(IDENT.configured_exe(table[s]["cli"])) for s in table])
     builds = IDENT.load_builds()
     out = []
     for slug, port in sorted(ports.items()):
@@ -262,6 +320,8 @@ def main() -> int:
                         default=str(Path.home() / ".craft-bridge" / "photocraft.token"))
     parser.add_argument("--no-live", action="store_true",
                         help="salta le porte: solo repo, shim, config, eseguibili")
+    parser.add_argument("--feed-dir", default=str(FEED.default_feed_dir()),
+                        help="cartella del feed del launcher (default: quella di questo sistema)")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
 
@@ -277,10 +337,18 @@ def main() -> int:
         entries = IDENT.shim_entries(config_path)
     except (SystemExit, json.JSONDecodeError):
         entries = {}
+    # Le versioni degli eseguibili si leggono una volta sola: ogni giro costa una
+    # chiamata a PowerShell, e la chiedono due controlli.
+    try:
+        exe_facts = IDENT.file_versions([str(IDENT.configured_exe(s["cli"]))
+                                        for s in table.values()])
+    except (SystemExit, OSError):
+        exe_facts = {}
     rows += check_config(config_path, table, install_dir, args.token_file)
-    rows += check_apps(table)
+    rows += check_apps(table, exe_facts)
+    rows += check_published(table, Path(args.feed_dir), exe_facts)
     if not args.no_live:
-        rows += check_live(table, entries)
+        rows += check_live(table, entries, exe_facts)
 
     todo = [r for r in rows if r["state"] == "fail"]
     report = {"checks": rows, "problems": len(todo), "ok": not todo,

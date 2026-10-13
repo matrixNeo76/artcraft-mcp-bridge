@@ -43,6 +43,9 @@ agiscono **sulla finestra aperta**.
 * PdfCraft resta l'eccezione strutturale: app guidabile, MCP senza ponte.
 * 13 server MCP in `~/.agents/mcp.json`, verificati uno per uno col comando reale.
 * 4 difetti veri trovati misurando, corretti alla causa e coperti dalla suite di guasti.
+* 11 app su 11 allineate alla release pubblicata dal launcher (feed del 13 ottobre),
+  letto da [craft-bridge-feed](tools/craft-bridge-feed.md): la versione installata non e'
+  solo quella che l'eseguibile dichiara, e' confrontata con quella del fornitore.
 
 # Relazioni
 
