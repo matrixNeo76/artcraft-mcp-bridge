@@ -1,5 +1,7 @@
 # ArtCraft MCP Bridge
 
+[![checks](https://github.com/matrixNeo76/artcraft-mcp-bridge/actions/workflows/checks.yml/badge.svg)](https://github.com/matrixNeo76/artcraft-mcp-bridge/actions/workflows/checks.yml)
+
 Ponte fra le **Crafting Apps** (CADCraft, DeckCraft, DesignCraft, FilmCraft, GridCraft,
 LightCraft, PhotoCraft, SoundCraft, VectorCraft, WordCraft, EffectCraft) e i client MCP:
 invece di ripiegare sulla CLI senza interfaccia, l'app viva viene guidata nel suo
@@ -71,6 +73,16 @@ uvx okfgen visualize docs -o reports/okf-graph.html    # grafo interattivo del b
 ```
 
 Il grafo generato è in [reports/okf-graph.html](reports/okf-graph.html): 28 nodi, 109 relazioni.
+
+## Controlli automatici
+
+A ogni push su `main` (e su ogni pull request) gira
+[checks.yml](.github/workflows/checks.yml): sintassi degli strumenti, interfacce,
+coerenza della tabella delle app con le porte documentate, determinismo dell'installer,
+conformità del bundle OKF e la suite con `--ci` — che su un runner senza app salta i casi
+d'ambiente **motivandoli**, mentre un guasto vero resta un FAIL. La suite intera gira su un
+runner self-hosted con le app installate (`CRAFTBRIDGE_SELF_HOSTED=1`). Dettagli in
+[docs/operations/ci.md](docs/operations/ci.md).
 
 ## Limiti dichiarati
 

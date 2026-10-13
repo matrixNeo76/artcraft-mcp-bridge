@@ -11,3 +11,5 @@
 * **Correzione**: `craft-bridge-config.py` riallinea anche i file installati, non solo le entry, quando il sorgente cambia.
 * **Misura**: 11 app su 12 guidabili e verificate dal vivo; 13/13 entry della config eseguite col comando reale; suite di guasti 10/10, due giri di fila identici.
 * **Installazione**: 13 server MCP in `~/.agents/mcp.json`, con il canale di controllo sulle porte attese.
+* **Aggiunta**: modalita' `--ci` della suite (salta i casi d'ambiente motivandoli) e workflow di integrazione continua in `.github/workflows/checks.yml`, con badge nel README.
+* **Correzione**: due difetti trovati eseguendo gli step del workflow in locale: in PowerShell `"$slug: ..."` viene letto come variabile con drive (`InvalidVariableReferenceWithDrive`, serve `"${slug}: ..."`) e il conteggio delle proprieta' di un oggetto JSON richiede `Measure-Object`, non `.Count`.

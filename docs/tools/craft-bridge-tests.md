@@ -29,7 +29,16 @@ python tools/craft-bridge-tests.py                 # tutto (~44 s, avvia app ver
 python tools/craft-bridge-tests.py --static        # solo i casi senza app (~10 s)
 python tools/craft-bridge-tests.py --only build --json
 python tools/craft-bridge-tests.py --report reports/mie.json --compare vecchio.json
+python tools/craft-bridge-tests.py --static --ci   # su un runner senza ponte installato
 ```
+
+# `--ci`
+
+Serve a un runner di CI: se la macchina non ha ne' la config dei connettori ne' le copie
+installate, i casi che parlano del ponte vengono **saltati spiegando perche'** invece di
+fallire. Un guasto vero resta un FAIL: la modalita' cambia cosa e' un ambiente assente, non
+cosa e' un guasto. Su una macchina con il ponte, `--ci` non cambia niente - verificato:
+6/6 senza salti. Vedi [Integrazione continua](../operations/ci.md).
 
 # Report e confronto
 
@@ -64,3 +73,4 @@ log e token di prova spariscono alla fine.
 - **verifica** [craft-bridge-doctor](craft-bridge-doctor.md), [craft-bridge-ident](craft-bridge-ident.md), [craft-bridge-launch](craft-bridge-launch.md)
 - **produce** [Report e baseline](../architecture/reports.md)
 - **nel runbook** [Diagnosi e verifica](../operations/diagnosis.md)
+- **eseguita a ogni push da** [Integrazione continua](../operations/ci.md) con `--static --ci`

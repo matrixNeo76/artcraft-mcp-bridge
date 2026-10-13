@@ -33,6 +33,7 @@ Uso:
     python craft-bridge-tests.py            # tutto (~1-2 min: avvia app vere)
     python craft-bridge-tests.py --static   # solo i casi che non avviano app (~5 s)
     python craft-bridge-tests.py --only build --json
+    python craft-bridge-tests.py --static --ci   # su un runner senza app ne' ponte installato
 
 Report:
     ogni esecuzione scrive `reports/craft-bridge-tests.json` (macchina) e
@@ -179,9 +180,28 @@ def patch_version(src: Path, dst: Path, new: str) -> None:
     dst.write_bytes(bytes(data))
 
 
-def case(name: str, kind: str = "e2e"):
+def environment_gap() -> str | None:
+    """Perche' su questa macchina non c'e' un ponte da provare (None se c'e').
+
+    Serve a `--ci`: su un runner di CI non ci sono app, ne' config dei connettori, ne'
+    copie installate, quindi i casi che parlano del ponte non hanno niente da
+    verificare. Con `--ci` quelli vengono **saltati spiegando perche'**, mentre un
+    guasto vero (per esempio il ponte installato con un byte in piu') resta un FAIL:
+    la modalita' cambia cosa e' un ambiente assente, non cosa e' un guasto.
+    """
+    if not CONFIG.DEFAULT_CONFIG.is_file():
+        return f"config assente ({CONFIG.DEFAULT_CONFIG})"
+    for src in (CONFIG.WRAPPER, CONFIG.IDENT):
+        target = CONFIG.DEFAULT_INSTALL_DIR / src.name
+        if not target.is_file():
+            return f"copia installata assente ({target})"
+    return None
+
+
+def case(name: str, kind: str = "e2e", env: bool = False):
+    """`env=True`: il caso ha bisogno del ponte installato su questa macchina."""
     def wrap(fn):
-        fn.case_name, fn.case_kind = name, kind
+        fn.case_name, fn.case_kind, fn.case_env = name, kind, env
         return fn
     return wrap
 
@@ -198,7 +218,7 @@ def first_fix(output: str) -> str:
     return ""
 
 
-@case("stato pulito", "static")
+@case("stato pulito", "static", env=True)
 def t_clean(run: Runner) -> tuple[str, str]:
     code, out, _ = run.run(str(HERE / "craft-bridge-doctor.py"))
     if code == 0 and "VERDETTO: tutto in ordine" in out:
@@ -206,7 +226,7 @@ def t_clean(run: Runner) -> tuple[str, str]:
     return "FAIL", f"uscita {code} (attesa 0): {first_fix(out) or 'vedi doctor'}"
 
 
-@case("shim installato stantio", "static")
+@case("shim installato stantio", "static", env=True)
 def t_stale_install(run: Runner) -> tuple[str, str]:
     installed = CONFIG.DEFAULT_INSTALL_DIR / "craft-bridge-ident.py"
     if not installed.is_file():
@@ -226,7 +246,7 @@ def t_stale_install(run: Runner) -> tuple[str, str]:
     return "PASS", "accusato e riparato dall'azione indicata"
 
 
-@case("entry di config sbagliata", "static")
+@case("entry di config sbagliata", "static", env=True)
 def t_bad_entry(run: Runner) -> tuple[str, str]:
     def mutate(servers):
         args = servers["deckcraft"]["args"]
@@ -241,7 +261,7 @@ def t_bad_entry(run: Runner) -> tuple[str, str]:
     return "PASS", "doctor e installer concordano: 1 entry da aggiornare"
 
 
-@case("percorso inesistente", "static")
+@case("percorso inesistente", "static", env=True)
 def t_broken_path(run: Runner) -> tuple[str, str]:
     def mutate(servers):
         servers["cadcraft"]["command"] = r"C:\Python-che-non-esiste\python.exe"
@@ -264,7 +284,7 @@ def t_missing_exe(run: Runner) -> tuple[str, str]:
     return "PASS", detail.split("mancano:")[-1].strip()
 
 
-@case("porta chiusa", "live")
+@case("porta chiusa", "live", env=True)
 def t_closed_port(run: Runner) -> tuple[str, str]:
     table = CONFIG.apps_table()
     ports = configured_ports(table, CONFIG.DEFAULT_CONFIG)
@@ -289,7 +309,7 @@ def t_closed_port(run: Runner) -> tuple[str, str]:
 # I casi: con app vere (solo su porte libere, e le chiude la suite)
 # ---------------------------------------------------------------------------------
 
-@case("app giusta sulla porta")
+@case("app giusta sulla porta", env=True)
 def t_good_build(run: Runner) -> tuple[str, str]:
     table = CONFIG.apps_table()
     slug, port = "gridcraft", configured_ports(table, CONFIG.DEFAULT_CONFIG)["gridcraft"]
@@ -314,7 +334,7 @@ def t_good_build(run: Runner) -> tuple[str, str]:
     return "PASS", f"{slug} {port}: ident/doctor/launcher tutti d'accordo"
 
 
-@case("build diversa")
+@case("build diversa", env=True)
 def t_drift_build(run: Runner) -> tuple[str, str]:
     table = CONFIG.apps_table()
     slug, port = "gridcraft", configured_ports(table, CONFIG.DEFAULT_CONFIG)["gridcraft"]
@@ -342,7 +362,7 @@ def t_drift_build(run: Runner) -> tuple[str, str]:
     return "PASS", "doctor, ident e launcher: tutti e tre exit 1 con 0.5.0 != 0.6.1"
 
 
-@case("altra app sulla porta")
+@case("altra app sulla porta", env=True)
 def t_wrong_app(run: Runner) -> tuple[str, str]:
     table = CONFIG.apps_table()
     ports = configured_ports(table, CONFIG.DEFAULT_CONFIG)
@@ -365,7 +385,7 @@ def t_wrong_app(run: Runner) -> tuple[str, str]:
     return "PASS", f"GridCraft su {port}: doctor e ident lo riconoscono"
 
 
-@case("credenziale rifiutata")
+@case("credenziale rifiutata", env=True)
 def t_bad_token(run: Runner) -> tuple[str, str]:
     table = CONFIG.apps_table()
     port = configured_ports(table, CONFIG.DEFAULT_CONFIG)["photocraft"]
@@ -423,7 +443,7 @@ def build_report(results: list[dict], args, seconds: float, previous: dict | Non
         "when": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
         "host": socket.gethostname(),
         "python": sys.version.split()[0],
-        "modes": {"static": bool(args.static), "only": args.only},
+        "modes": {"static": bool(args.static), "only": args.only, "ci": bool(args.ci)},
         "tools": tool_hashes(),
         "cases": results,
         "passed": len(results) - len(failed) - len(skipped),
@@ -494,6 +514,7 @@ def markdown(report: dict, changes: list[str], previous: dict | None) -> str:
         f"**Generato:** {when} · **host:** {report['host']} · **Python:** {report['python']}",
         f"**Modi:** {'solo statici' if report['modes']['static'] else 'completo'}"
         + (f" · filtro `{report['modes']['only']}`" if report["modes"]["only"] else "")
+        + (" · CI (casi d'ambiente saltati)" if report["modes"].get("ci") else "")
         + f" · **durata:** {report['seconds']}s",
         "**Strumenti:** " + " · ".join(f"`{n.replace('craft-bridge-', '').replace('.py', '')}` "
                                       f"`{h}`" for n, h in report["tools"].items()),
@@ -530,6 +551,9 @@ def main() -> int:
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--static", action="store_true", help="solo i casi senza app avviate")
+    parser.add_argument("--ci", action="store_true",
+                        help="salta spiegando perche' i casi che richiedono il ponte "
+                             "installato su questa macchina (per un runner di CI)")
     parser.add_argument("--only", help="filtra per nome (sottostringa)")
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--report", "--out", dest="report", default=str(DEFAULT_REPORT),
@@ -576,8 +600,12 @@ def main() -> int:
     try:
         for fn in cases:
             started = time.time()
+            gap = environment_gap() if (args.ci and fn.case_env) else None
             try:
-                state, detail = fn(run)
+                if gap:
+                    state, detail = "SKIP", f"ambiente assente su questo runner: {gap}"
+                else:
+                    state, detail = fn(run)
             except Exception as exc:                     # un caso non deve fermare la suite
                 state, detail = "FAIL", f"eccezione: {type(exc).__name__}: {exc}"
             results.append({"case": fn.case_name, "kind": fn.case_kind, "state": state,
@@ -614,8 +642,10 @@ def main() -> int:
             print("falliti:")
             for r in failed:
                 print(f"  - {r['case']}: {r['detail']}")
-        elif skipped:
-            print("saltati (porte occupate da app non avviate da questa suite)")
+        if skipped:
+            print("saltati:")
+            for r in skipped:
+                print(f"  - {r['case']}: {r['detail']}")
         if previous_from is not None and not args.no_compare:
             if previous is None:
                 print(f"\nconfronto: nessun report precedente in {previous_from}"

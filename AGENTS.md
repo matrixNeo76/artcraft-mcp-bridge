@@ -44,6 +44,12 @@ python tools/craft-bridge-tests.py --static  # ~10 s, i casi che non avviano app
 python tools/craft-bridge-tests.py           # ~44 s, compresi i casi con app vere
 ```
 
+In CI gira `python tools/craft-bridge-tests.py --static --ci`: `--ci` salta i casi che
+richiedono il ponte **spiegando perché**, e non va mai usata per far passare una macchina
+vera (lì i salti non ci sono, e un guasto vero resta un FAIL). Gli step del workflow si
+possono eseguire in locale estraendoli da `.github/workflows/checks.yml` ed eseguendoli con
+`powershell -NoProfile -ExecutionPolicy Bypass -File step.ps1`.
+
 Se hai toccato shim, ident o doctor, la suite completa è obbligatoria: è lei che
 dichiara se il comportamento è cambiato, e confronta da sola con l'esecuzione
 precedente (`reports/craft-bridge-tests.md`, sezione *Confronto*).

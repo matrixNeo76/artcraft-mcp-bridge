@@ -39,6 +39,7 @@ generati stanno fuori dal bundle, in `tools/`, `install/`, `reports/`.
 * [Installare e riparare](operations/install-and-repair.md) - runbook
 * [Diagnosi e verifica](operations/diagnosis.md) - runbook
 * [Regole di sicurezza](operations/safety-rules.md) - cosa non si tocca mai
+* [Integrazione continua](operations/ci.md) - cosa controlla ogni push, e cosa significa `--ci`
 
 # Difetti trovati e corretti
 * [Ripiego silenzioso sul peer muto](findings/silent-fallback.md)

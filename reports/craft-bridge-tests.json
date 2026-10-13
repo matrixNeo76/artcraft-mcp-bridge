@@ -1,17 +1,18 @@
 {
-  "when": "2026-10-13T16:29:19",
+  "when": "2026-10-13T16:46:11",
   "host": "wkai01",
   "python": "3.12.10",
   "modes": {
     "static": false,
-    "only": null
+    "only": null,
+    "ci": false
   },
   "tools": {
     "craft-bridge-mcp.py": "3f4bf8aa1ad4",
     "craft-bridge-ident.py": "8df181789548",
     "craft-bridge-doctor.py": "e16e1ab9f82a",
     "craft-bridge-config.py": "7776f22be252",
-    "craft-bridge-tests.py": "2084a9f8a81c"
+    "craft-bridge-tests.py": "1571ea4262fb"
   },
   "cases": [
     {
@@ -26,7 +27,7 @@
       "kind": "static",
       "state": "PASS",
       "detail": "accusato e riparato dall'azione indicata",
-      "seconds": 2.0
+      "seconds": 1.9
     },
     {
       "case": "entry di config sbagliata",
@@ -68,14 +69,14 @@
       "kind": "e2e",
       "state": "PASS",
       "detail": "doctor, ident e launcher: tutti e tre exit 1 con 0.5.0 != 0.6.1",
-      "seconds": 10.3
+      "seconds": 10.4
     },
     {
       "case": "altra app sulla porta",
       "kind": "e2e",
       "state": "PASS",
       "detail": "GridCraft su 7972: doctor e ident lo riconoscono",
-      "seconds": 7.5
+      "seconds": 7.7
     },
     {
       "case": "credenziale rifiutata",
@@ -89,9 +90,9 @@
   "failed": 0,
   "skipped": 0,
   "ok": true,
-  "seconds": 44.4,
-  "compared_with": "2026-10-13T16:28:34",
-  "previous_seconds": 44.4,
+  "seconds": 44.7,
+  "compared_with": "2026-10-13T16:45:26",
+  "previous_seconds": 45.0,
   "changes": [],
   "report_files": {
     "json": "C:\\Users\\auresystem\\repos\\artcraft-mcp-bridge\\reports\\craft-bridge-tests.json",

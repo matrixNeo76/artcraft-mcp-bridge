@@ -1,0 +1,155 @@
+name: checks
+
+# Un push non deve poter rompere il ponte in silenzio.
+#
+# Su un runner GitHub-hosted si verifica cio' che non dipende dalla macchina:
+# sintassi degli strumenti, loro interfacce, coerenza della tabella delle app,
+# determinismo dell'installer, conformita' del bundle OKF e i casi della suite che
+# non hanno bisogno di app ne' del ponte installato. I casi che parlano del ponte
+# vero (doctor pulito, shim installato, app su una porta) su un runner non hanno
+# niente da verificare: con `--ci` vengono saltati spiegando perche', e un guasto
+# vero resta un FAIL. Il report della suite finisce fra gli artefatti della run.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  controlli:
+    name: controlli (runner hosted)
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Sintassi degli strumenti
+        shell: pwsh
+        run: |
+          $files = Get-ChildItem tools/*.py
+          python -m py_compile $files.FullName
+          if ($LASTEXITCODE -ne 0) { throw "py_compile fallito" }
+          "ok: $($files.Count) strumenti compilano"
+
+      - name: Interfacce degli strumenti (--help)
+        shell: pwsh
+        run: |
+          # I server stdio (artcraft-mcp-proxy) non hanno una CLI: un --help li
+          # farebbe partire in attesa di stdin. Si riconoscono dall'assenza di argparse.
+          $failed = @()
+          foreach ($f in Get-ChildItem tools/*.py) {
+            if (-not (Select-String -Path $f.FullName -Pattern "argparse" -Quiet)) {
+              "salto  $($f.Name): server stdio, non e' una CLI"
+              continue
+            }
+            python $f.FullName --help > $null 2>&1
+            if ($LASTEXITCODE -ne 0) { $failed += $f.Name; "FAIL   $($f.Name)" }
+            else { "ok     $($f.Name)" }
+          }
+          if ($failed.Count) { throw "non rispondono a --help: $($failed -join ', ')" }
+
+      - name: Tabella delle app coerente con le porte documentate
+        shell: pwsh
+        run: |
+          $table = python tools/craft-bridge-mcp.py --dump-apps | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw "--dump-apps e' fallito" }
+          $expected = [ordered]@{ cadcraft = 7971; deckcraft = 7972; designcraft = 7973
+                                 filmcraft = 7974; gridcraft = 7975; photocraft = 7976
+                                 soundcraft = 7977; wordcraft = 7978; vectorcraft = 7979
+                                 lightcraft = 7980; effectcraft = 9877 }
+          $count = ($table.PSObject.Properties | Measure-Object).Count
+          if ($count -ne $expected.Count) { throw "app nella tabella: $count, attese $($expected.Count)" }
+          foreach ($slug in $expected.Keys) {
+            # `"${slug}: ..."` con le graffe: senza, PowerShell legge `$slug:` come
+            # variabile con drive (`$env:`), e lo step moriva con
+            # InvalidVariableReferenceWithDrive invece di dire cosa non andava.
+            $entry = $table.$slug
+            if (-not $entry) { throw "${slug} manca dalla tabella" }
+            if ($entry.port -ne $expected[$slug]) {
+              throw "${slug}: porta $($entry.port), attesa $($expected[$slug])"
+            }
+            if (-not (Test-Path $entry.cli -IsValid)) { throw "${slug}: percorso CLI non valido" }
+          }
+          "ok: $count app, porte come documentate"
+
+      - name: Installer deterministico (due giri identici)
+        shell: pwsh
+        run: |
+          $tmp = Join-Path $env:RUNNER_TEMP "ci-installer"
+          New-Item -ItemType Directory -Force -Path $tmp | Out-Null
+          python tools/craft-bridge-config.py --json --config "$tmp/mcp.json" --install-dir "$tmp/prog" > "$tmp/a.json"
+          if ($LASTEXITCODE -ne 0) { throw "il primo giro e' fallito" }
+          python tools/craft-bridge-config.py --json --config "$tmp/mcp.json" --install-dir "$tmp/prog" > "$tmp/b.json"
+          if ($LASTEXITCODE -ne 0) { throw "il secondo giro e' fallito" }
+          $diff = Compare-Object (Get-Content "$tmp/a.json") (Get-Content "$tmp/b.json")
+          if ($diff) { throw "due giri diversi: le entry non sono deterministiche" }
+          $entries = (Get-Content "$tmp/a.json" -Raw | ConvertFrom-Json).mcpServers.PSObject.Properties
+          $n = ($entries | Measure-Object).Count
+          if ($n -ne 11) { throw "entry generate: $n, attese 11" }
+          "ok: $n entry, due giri identici"
+
+      - name: Bundle di documentazione conforme a OKF v0.2
+        shell: pwsh
+        run: |
+          uvx okfgen validate docs --strict
+          if ($LASTEXITCODE -ne 0) { throw "il bundle non e' conforme a OKF v0.2" }
+
+      - name: Suite dei guasti (casi eseguibili su questo runner)
+        shell: pwsh
+        run: |
+          python tools/craft-bridge-tests.py --static --ci
+          if ($LASTEXITCODE -ne 0) { throw "la suite ha trovato un guasto" }
+
+      - name: Report della suite
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: craft-bridge-tests
+          path: reports/craft-bridge-tests.*
+          if-no-files-found: warn
+
+  ponte-completo:
+    # La suite intera ha senso solo dove il ponte esiste: un runner self-hosted con
+    # le Crafting Apps installate. Si attiva con la variabile di repository
+    # CRAFTBRIDGE_SELF_HOSTED=1 (Settings -> Secrets and variables -> Actions -> Variables).
+    name: suite completa (runner self-hosted)
+    if: ${{ vars.CRAFTBRIDGE_SELF_HOSTED == '1' }}
+    runs-on: [self-hosted, windows, craftbridge]
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Diagnosi della macchina
+        shell: pwsh
+        run: |
+          python tools/craft-bridge-doctor.py
+          if ($LASTEXITCODE -ne 0) { throw "la diagnosi ha trovato problemi: vedi le azioni sopra" }
+
+      - name: Suite completa (avvia app vere su porte libere)
+        shell: pwsh
+        run: |
+          python tools/craft-bridge-tests.py
+          if ($LASTEXITCODE -ne 0) { throw "la suite ha trovato un guasto" }
+
+      - name: Report della suite
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: craft-bridge-tests-selfhosted
+          path: reports/craft-bridge-tests.*
+          if-no-files-found: warn
