@@ -105,6 +105,23 @@ gh variable delete CRAFTBRIDGE_SELF_HOSTED     # the job goes back to being skip
 then delete the runner folder and the Startup entry. The two together are the switch: the variable
 alone, or the runner alone, changes nothing.
 
+# The steps of the self-hosted job
+
+| Step | What it does |
+|---|---|
+| Diagnosis | `craft-bridge-doctor.py`; a non-zero exit fails the job with the actions it listed |
+| Full suite | `craft-bridge-tests.py` **without** `--ci`: here the absent-environment skips are not forgiven |
+| Artifact | `craft-bridge-tests-selfhosted` (the hosted job's is `craft-bridge-tests`: two different names, so the two runs do not overwrite each other) |
+
+The steps use `powershell`, not `pwsh` - see above.
+
+Measured on the first green run (the push of 2026-10-13 that wrote this node): **23 cases, 22 PASS,
+1 SKIP, 0 FAIL, 74 s**, on the machine that has the apps. The skip is the declared one: *live
+PdfCraft window* - the window was closed, so the entry would go headless, which is not a fault.
+Among the 22 that ran there are the ones that start a real app (*app on the port*, *different
+build*, *another app on the port*, *refused credential*, *attach flag, live*): those are the cases
+this job exists for.
+
 # The steps of the hosted job
 
 | Step | What it verifies | Why |
