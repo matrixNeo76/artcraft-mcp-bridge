@@ -189,6 +189,11 @@ in the same commit, which is a decision and not an accident. Refresh it in the s
 red for a closed window. The gate itself is in
 [craft-bridge-tests](../tools/craft-bridge-tests.md).
 
+Proved, not assumed: on a throwaway branch whose baseline declared a proof the machine did not
+have (PdfCraft `PASS` with the window closed) this job failed with `regressione rispetto alla
+baseline` and the offending case named in the log, while the hosted job stayed green - its
+`--static --ci` run has its own baseline and does not accuse another mode's file.
+
 # The steps of the hosted job
 
 | Step | What it verifies | Why |
