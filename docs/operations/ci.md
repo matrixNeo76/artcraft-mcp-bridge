@@ -46,7 +46,8 @@ lives:
 | Runner | `craftbridge-auresystem`, version 2.338.0, in `C:\Users\auresystem\actions-runner-craftbridge` |
 | Labels | `self-hosted`, `windows`, `craftbridge` (they must match the job's `runs-on`) |
 | Starts at logon | `%APPDATA%\...\Startup\craftbridge-actions-runner.cmd` → `start-runner.cmd` → `run.cmd` |
-| Log | `C:\Users\auresystem\actions-runner-craftbridge\runner.log` |
+| Runner log | `C:\Users\auresystem\actions-runner-craftbridge\runner.log` (the runner's own: while it runs it holds the file open) |
+| Launcher log | `C:\Users\auresystem\actions-runner-craftbridge\start-runner.log` (so the launcher's lines do not compete for a locked file) |
 | Online check | `gh api repos/<owner>/<repo>/actions/runners` → `"status": "online"` |
 
 **One detail that looks like a mistake.** `gh api .../actions/runners` lists the labels as
@@ -84,10 +85,67 @@ bin/Runner.Listener.exe configure --url https://github.com/<owner>/<repo> \
 powershell -NoProfile -Command "Start-Process -FilePath '<dir>\start-runner.cmd' -WindowStyle Minimized"
 ```
 
+From Git Bash, call the script as `MSYS_NO_PATHCONV=1 ./start-runner.cmd`: without it `cmd /c
+script.cmd` becomes a path (`/c` turns into `C:\`), cmd opens an interactive shell that reads stdin
+and the command hangs with no output. Wasted two minutes on it.
+
 **Why not a Windows service.** The suite starts the Crafting Apps and drives their windows, and a
 service runs in session 0, where those windows do not exist: the runner would be online and unable
 to prove anything. The Startup folder starts it inside the user's session, which is exactly where
 the bridge exists. A scheduled task "at logon" would do the same but needs administrator rights.
+
+**It starts once.** The launcher is **idempotent**: if a listener of this folder is already alive
+(exit and log back in inside the same session, double click on the entry) it writes a line to
+`start-runner.log` and stops, instead of registering a second listener on the same runner. That is
+what check it uses, and how it was proved:
+
+| Attempt | Outcome |
+|---|---|
+| `Get-CimInstance -Filter "Name='Runner.Listener.exe'"` inside a `for /f` | **wrong**: cmd eats the escaped quotes, PowerShell receives `Name 'Runner.Listener.exe'`, the query is invalid and the count comes out `0` — a check that checks nothing |
+| `Get-Process Runner.Listener | Where-Object { $_.Path -like '<dir>bin*' }` | right: `1` with the listener alive, `0` without |
+| the launcher with a listener alive | exit 0, one line in `start-runner.log`, **still one** listener process |
+| the listener stopped, then the launcher | new listener in the user's session, online, and a dispatched run was taken (`Running job` in `runner.log`) |
+
+Two more traps, both inside the script: no parentheses inside an `if (...)` block (they close the
+block early and the batch file dies with `: non atteso`), and the log must not be `runner.log` while
+the runner holds it open (`the file is being used by another process` — the line one needs is exactly
+the one that cannot be written).
+
+**After a forced stop.** Killing the listener does not kill the registration, but GitHub keeps the
+old session for about two minutes: the new listener gets `A session for this runner already exists`
+and `Conflict. Retrying until reconnected.`, then creates the session and prints `Listening for
+Jobs`. A run dispatched **inside that window** can stay queued forever even after the reconnection -
+renumber the dispatch and it starts immediately. Measured: killed at 21:25 local, conflict until
+19:27:40Z, `Listening for Jobs`; the job dispatched at 19:26:51Z stayed `queued`, the one dispatched
+at 19:33 took the runner at 19:33:48Z and succeeded. So: after a restart, dispatch again instead of
+staring at the queue.
+
+**The two files on the machine** (they live outside the repo because they name this machine):
+`start-runner.cmd` next to the runner, and one line of Startup in
+`%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\craftbridge-actions-runner.cmd`:
+
+```bat
+start "craftbridge-actions-runner" /min "C:\Users\auresystem\actions-runner-craftbridge\start-runner.cmd"
+```
+
+The operative part of `start-runner.cmd` (the file on the machine carries the comments, in Italian
+like the rest of the code):
+
+```bat
+set RUNNER_DIR=%~dp0
+cd /d "%RUNNER_DIR%"
+
+set ALIVE=?
+for /f "usebackq delims=" %%N in (`powershell -NoProfile -Command "(Get-Process Runner.Listener -ErrorAction SilentlyContinue | Where-Object { $_.Path -like '%RUNNER_DIR%bin*' }).Count"`) do set ALIVE=%%N
+if not "%ALIVE%"=="0" (
+  echo ==== %DATE% %TIME% un listener e' gia' attivo, conteggio %ALIVE%, nessuna seconda partenza ==== >> "%RUNNER_DIR%start-runner.log"
+  exit /b 0
+)
+
+echo ==== avvio %DATE% %TIME% (cartella %RUNNER_DIR: =%) ==== >> "%RUNNER_DIR%start-runner.log"
+call "%RUNNER_DIR%run.cmd" >> "%RUNNER_DIR%runner.log" 2>&1
+echo ==== uscita %DATE% %TIME% (codice %ERRORLEVEL%) ==== >> "%RUNNER_DIR%start-runner.log"
+```
 
 **Why it never runs on pull requests.** This repository is public: a pull request, including one
 from a fork, would run a stranger's code on the machine where the bridge is installed, and that is
