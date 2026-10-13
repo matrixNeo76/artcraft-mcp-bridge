@@ -1,63 +1,64 @@
 ---
 type: Policy
-title: "Regole di sicurezza del progetto"
-description: "Le regole che valgono sempre: cosa non si modifica, quali file sono sacri, come si prova senza toccare la configurazione vera."
+title: "Project safety rules"
+description: "The rules that always hold: what is not modified, which files are sacred, how to test without touching the real configuration."
 resource: ../../README.md
-tags: [policy, sicurezza, regole]
+tags: [policy, safety, rules]
 generated: { by: process:freebuff-buffy, at: 2026-10-13T14:26:01Z }
 status: stable
 sources:
 - resource: ../../docs/reference/craft-bridge.md
-  title: Manuale tecnico completo
+  title: complete technical manual
 - resource: ../../tools/craft-bridge-tests.py
-  title: La suite che prova gli strumenti
+  title: the suite that exercises the tools
 ---
 
-# File che non si toccano a mano
+# Files that are never edited by hand
 
-* `~/.agents/mcp.json` (la config dei connettori): la scrive solo
-  `craft-bridge-config.py --apply`, che fa il backup prima.
-* `%LOCALAPPDATA%\Programs\craft-bridge\*`: sono copie; si aggiornano con
-  `--apply`, non a mano.
-* `~/.craft-bridge/photocraft.token`: lo scrive l'app. Il valore non si stampa mai,
-  non finisce in chat e non entra nel repo.
+* `~/.agents/mcp.json` (the connector config): only `craft-bridge-config.py --apply`
+  writes it, and it backs it up first.
+* `%LOCALAPPDATA%\Programs\craft-bridge\*`: these are copies; they are updated with
+  `--apply`, not by hand.
+* `~/.craft-bridge/photocraft.token`: the app writes it. The value is never printed, never
+  goes into chat and never enters the repo.
 
-# Regole delle prove
+# Rules of the tests
 
-* La configurazione **vera** non viene mai usata come cavia: i test la riguardano su
-  una copia temporanea con `--config`.
-* L'unico file vero che la suite tocca e' la copia installata dello shim, dentro un
-  `try/finally` che la rimette a posto; se serve, `--apply` la riallinea.
-* Le app si avviano **solo su porte libere**; una porta occupata fa saltare il caso,
-  non autorizza a uccidere processi altrui.
-* Temporanei, log e token di prova si cancellano alla fine.
+* The **real** configuration is never used as a guinea pig: the tests exercise it on a
+  temporary copy with `--config`.
+* The only real file the suite touches is the installed copy of the shim, inside a
+  `try/finally` that puts it back; if needed, `--apply` realigns it.
+* Apps are started **only on free ports**; an occupied port makes the case skip, it does
+  not authorise killing someone else's processes.
+* Temporary files, logs and test tokens are deleted at the end.
 
-# Scaricare i pacchetti pubblicati
+# Downloading published packages
 
-`craft-bridge-feed.py --download <slug>` scarica un pacchetto dal feed del launcher per
-confrontarne i byte. Le regole valgono anche quando sarebbe comodo farne a meno:
+`craft-bridge-feed.py --download <slug>` downloads one package from the launcher feed in
+order to compare its bytes. The rules hold even when it would be convenient to skip them:
 
-* solo su richiesta esplicita e un'app alla volta: i pacchetti vanno da 14 a 120 MB, e
-  scaricarli tutti "per sicurezza" e' un modo per non farlo nessuno;
-* solo `https`, e solo verso gli host di GitHub elencati nel codice: il feed e' un file
-  locale, che chiunque puo' riscrivere, quindi prima di aprire una connessione si
-  controlla a chi si sta parlando;
-* l'impronta `sha256` pubblicata si verifica **prima** di usare il file, che resta
-  `<nome>.parte` finche' non torna: se non torna viene **cancellato**, e il download
-  fallito non diventa mai un verdetto sui byte;
-* niente si estrae su disco: il file dentro l'archivio si legge in memoria, cosi' non
-  nasce una seconda copia dell'app da qualche parte;
-* la cache e' `~/.craft-bridge/releases` e si cancella quando si vuole: non e' la
-  cartella del launcher, che e' sua.
+* only on explicit request and one app at a time: packages run from 14 to 120 MB, and
+  downloading them all "just in case" is a way of getting none of them done;
+* `https` only, and only towards the GitHub hosts listed in the code: the feed is a local
+  file that anyone can rewrite, so before opening a connection we check who we are talking
+  to;
+* the published `sha256` digest is verified **before** the file is used, and it stays
+  `<name>.parte` until it matches: if it does not match it is **deleted**, and a failed
+  download never becomes a verdict on the bytes;
+* nothing is extracted to disk: the file inside the archive is read in memory, so a second
+  copy of the app does not appear anywhere;
+* the cache is `~/.craft-bridge/releases` and can be deleted at will: it is not the
+  launcher's folder, which is the launcher's own.
 
-# Sorgente contro installato
+# Source against installed
 
-Modificare shim o `ident` nel repo **non** cambia quello che Freebuff esegue: serve
-`python tools/craft-bridge-config.py --apply`. La diagnosi segnala la differenza -
-vedi [Installato, sorgente e MCP globale](../architecture/installation-layout.md).
+Changing the shim, `ident` or the window translator in the repo does **not** change what
+Freebuff runs: `python tools/craft-bridge-config.py --apply` is required. The diagnosis
+reports the difference - see
+[Installed, source and global MCP](../architecture/installation-layout.md).
 
-# Relazioni
+# Relations
 
-- **applicate da** [craft-bridge-tests](../tools/craft-bridge-tests.md)
-- **verificate da** [craft-bridge-doctor](../tools/craft-bridge-doctor.md)
-- **valgono anche per** [craft-bridge-feed](../tools/craft-bridge-feed.md) - gli scaricamenti su richiesta
+- **enforced by** [craft-bridge-tests](../tools/craft-bridge-tests.md)
+- **checked by** [craft-bridge-doctor](../tools/craft-bridge-doctor.md)
+- **they apply to** [craft-bridge-feed](../tools/craft-bridge-feed.md) too - on-demand downloads

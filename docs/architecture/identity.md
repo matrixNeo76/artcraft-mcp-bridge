@@ -1,54 +1,55 @@
 ---
 type: Mechanism
-title: "Identita' dell'app e build che gira"
-description: "Due domande distinte: chi risponde sulla porta (catalogo dei comandi, soglia 0,9) e quale versione gira davvero (PID, eseguibile, riga di avvio, builds.json)."
+title: "App identity and the build that is running"
+description: "Two distinct questions: who answers on the port (command catalogue, 0.9 threshold) and which version is really running (PID, executable, startup line, builds.json)."
 resource: ../../tools/craft-bridge-ident.py
-tags: [identita, build, misura]
+tags: [identity, build, measurement]
 generated: { by: process:freebuff-buffy, at: 2026-10-13T14:26:01Z }
 status: stable
 sources:
 - resource: ../../tools/craft-bridge-ident.py
-  title: implementazione
+  title: implementation
 - resource: ../../tools/craft-bridge-doctor.md
-  title: chi la usa per il verdetto
+  title: who uses it for the verdict
 - resource: ../../tools/craft-bridge-tests.py
-  title: La suite che prova gli strumenti
+  title: the suite that exercises the tools
 ---
 
-# Chi risponde
+# Who answers
 
-Aprire un canale non basta: la porta giusta puo' essere occupata da un'altra app.
-L'identita' si stabilisce confrontando il **catalogo dei comandi** dichiarato dal
-peer con quello dell'app attesa:
+Opening a channel is not enough: the right port may be occupied by another app. Identity
+is established by comparing the **command catalogue** declared by the peer with that of
+the expected app:
 
-| Copertura | Significato |
+| Coverage | Meaning |
 |---|---|
-| 1.00 | e' l'app giusta |
-| <= 0.15 | e' un'altra app |
+| 1.00 | it is the right app |
+| <= 0.15 | it is another app |
 
-Sotto la soglia di 0,9 il peer non e' considerato questa app: lo shim va headless e
-il launcher esce 1.
+Below the 0.9 threshold the peer is not considered to be this app: the shim goes headless
+and the launcher exits 1.
 
-# Quale build
+# Which build
 
-La versione non si chiede al catalogo: si legge dal **processo che ascolta** (PID
-della porta), dall'eseguibile di quel processo e dalla riga di avvio che l'app scrive
-da sola nel log. `--record` registra l'impronta in `~/.craft-bridge/builds.json`,
-cosi' il confronto successivo e' contro un valore noto e non contro se stesso.
+The version is not asked to the catalogue: it is read from the **process that is
+listening** (the port's PID), from that process's executable and from the startup line the
+app writes by itself into its log. `--record` stores the digest in
+`~/.craft-bridge/builds.json`, so the next comparison is against a known value rather than
+against itself.
 
-Misurato su due build vere della stessa app (0.5.0 contro 0.6.1): la copertura del
-catalogo resta **1.00** - per l'identita' per app e' "l'app giusta" - e la build
-risulta `different`, con `ident` e launcher in uscita 1.
+Measured on two real builds of the same app (0.5.0 against 0.6.1): the catalogue coverage
+stays at **1.00** — to per-app identity it is "the right app" — and the build comes out
+`different`, with `ident` and the launcher exiting 1.
 
-# Limite dichiarato
+# Declared limit
 
-L'eseguibile dice la **versione**, non il contenuto: due build con la stessa versione
-e senza revisione nella riga di avvio sono indistinguibili. Il confronto non e' una
-verifica di integrita' (nessun hash del binario).
+The executable says the **version**, not the content: two builds with the same version and
+no revision in the startup line are indistinguishable. The comparison is not an integrity
+check (there is no hash of the binary).
 
-# Relazioni
+# Relations
 
-- **usata da** [Modi dello shim](shim-modes.md) - per non guidare l'app sbagliata
-- **usata da** [craft-bridge-doctor](../tools/craft-bridge-doctor.md) - per il verdetto sulle porte
-- **provata da** [craft-bridge-tests](../tools/craft-bridge-tests.md) - build 0.5.0 e app sbagliata iniettate
-- **usata da** [craft-bridge-launch](../tools/craft-bridge-launch.md) - `--verify`, `--record-builds`
+- **used by** [Shim modes](shim-modes.md) - so as not to drive the wrong app
+- **used by** [craft-bridge-doctor](../tools/craft-bridge-doctor.md) - for the verdict on the ports
+- **proved by** [craft-bridge-tests](../tools/craft-bridge-tests.md) - injected build 0.5.0 and wrong app
+- **used by** [craft-bridge-launch](../tools/craft-bridge-launch.md) - `--verify`, `--record-builds`

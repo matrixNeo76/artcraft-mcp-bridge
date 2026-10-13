@@ -1,47 +1,47 @@
 ---
 type: Finding
-title: "App sbagliata e build diversa sulla porta"
-description: "Aprire il canale non basta: la porta puo' essere di un'altra app o di un'altra versione. L'identita' si prova col catalogo dei comandi, la versione col processo che ascolta."
+title: "Wrong app and different build on the port"
+description: "Opening the channel is not enough: the port may belong to another app or to another version. Identity is proved with the command catalogue, the version with the process that is listening."
 resource: ../../tools/craft-bridge-ident.py
-tags: [difetto, identita, build]
+tags: [defect, identity, build]
 generated: { by: process:freebuff-buffy, at: 2026-10-13T14:26:01Z }
 status: stable
 sources:
 - resource: ../../tools/craft-bridge-ident.py
-  title: chi lo rileva
+  title: what detects it
 - resource: ../../docs/architecture/identity.md
-  title: il meccanismo
+  title: the mechanism
 ---
 
-# App sbagliata
+# Wrong app
 
-La porta attesa puo' essere occupata da un'altra Crafting App. Misurato: l'app giusta
-copre **1.00** del proprio catalogo di comandi, qualunque altra sta **sotto 0.15**.
-Con la app sbagliata lo shim va headless e il launcher esce 1.
+The expected port may be occupied by another Crafting App. Measured: the right app covers
+**1.00** of its own command catalogue, any other stays **below 0.15**. With the wrong app
+the shim goes headless and the launcher exits 1.
 
-# Build diversa
+# Different build
 
-Misurato con una seconda build vera della stessa app (0.5.0 contro 0.6.1) sulla porta
-attesa di 0.6.1: la copertura del catalogo resta 1.00 - per l'identita' per app e'
-"l'app giusta" - ma la build risulta `different`, con `ident` e launcher in uscita 1,
-e lo shim che avvisa all'avvio ma procede bridged.
+Measured with a second real build of the same app (0.5.0 against 0.6.1) on 0.6.1's
+expected port: the catalogue coverage stays at 1.00 - to per-app identity it is "the right
+app" - but the build comes out `different`, with `ident` and the launcher exiting 1, and
+the shim warning at startup yet proceeding bridged.
 
-Provato anche il caso in cui l'eseguibile viene aggiornato **sotto** il processo:
-vale la versione dichiarata dal processo, con la nota che il file su disco ora e'
-un'altra cosa.
+The case where the executable is updated **underneath** the process was tried too: the
+version declared by the process wins, with the note that the file on disk is now something
+else.
 
-# Limite che resta
+# Remaining limit
 
-L'eseguibile dice la versione, non il contenuto: due build con la stessa versione -
-e senza revisione nella riga di avvio - sono indistinguibili. Non e' una verifica di
-integrita': nessun hash del binario.
+The executable says the version, not the content: two builds with the same version - and no
+revision in the startup line - are indistinguishable. It is not an integrity check: there
+is no hash of the binary.
 
-# Copertura
+# Coverage
 
-Casi *build diversa* e *altra app sulla porta* nella
-[suite dei guasti](../tools/craft-bridge-tests.md).
+The *different build* and *other app on the port* cases in the
+[fault suite](../tools/craft-bridge-tests.md).
 
-# Relazioni
+# Relations
 
-- **meccanismo in** [Identita' e build](../architecture/identity.md)
-- **usato da** [craft-bridge-doctor](../tools/craft-bridge-doctor.md) e [craft-bridge-launch](../tools/craft-bridge-launch.md)
+- **mechanism in** [Identity and build](../architecture/identity.md)
+- **used by** [craft-bridge-doctor](../tools/craft-bridge-doctor.md) and [craft-bridge-launch](../tools/craft-bridge-launch.md)

@@ -1,43 +1,43 @@
 ---
 type: Tool
-title: "craft-bridge-sweep - headless contro bridged"
-description: "Avvia una app alla volta e misura gli stessi tool nei due modi, per provare che il ponte aggiunge capacita' sulla finestra invece di sostituire la CLI."
+title: "craft-bridge-sweep - headless against bridged"
+description: "Starts one app at a time and measures the same tools in both modes, to prove that the bridge adds capability on the window instead of replacing the CLI."
 resource: ../../tools/craft-bridge-sweep.py
-tags: [strumento, misura, confronto]
+tags: [tool, measurement, comparison]
 generated: { by: process:freebuff-buffy, at: 2026-10-13T14:26:01Z }
 status: stable
 sources:
 - resource: ../../tools/craft-bridge-sweep.py
-  title: sorgente
+  title: source
 - resource: ../../reports/craft-bridge-sweep.json
-  title: il report prodotto
+  title: the report it produces
 - resource: ../../docs/reference/craft-bridge.md
-  title: Manuale tecnico completo
+  title: complete technical manual
 ---
 
-# Cosa fa
+# What it does
 
-Per ogni app: esegue l'entry headless, raccoglie i tool; avvia l'app col canale di
-controllo, rifa' la stessa raccolta in bridged, e mette a confronto i due elenchi -
-inclusi i **nomi solo-app**, cioe' i tool che esistono solo guidando la finestra
-viva. Poi chiude l'app.
+For every app: it runs the headless entry and collects the tools; it starts the app with
+the control channel, repeats the same collection in bridged mode, and compares the two
+lists - including the **app-only names**, that is the tools that exist only by driving
+the live window. Then it closes the app.
 
-# Interfaccia
+# Interface
 
 ```
-python tools/craft-bridge-sweep.py                     # tutte le app in config
+python tools/craft-bridge-sweep.py                     # every app in the config
 python tools/craft-bridge-sweep.py --apps gridcraft,photocraft --wait 60
-python tools/craft-bridge-sweep.py --skip-tool         # solo gli elenchi, nessuna chiamata
+python tools/craft-bridge-sweep.py --skip-tool         # lists only, no call
 python tools/craft-bridge-sweep.py --out reports/sweep.json
 ```
 
-# Esito
+# Outcome
 
-Report in `reports/craft-bridge-sweep.json` (default): per ogni app i due elenchi di
-tool, i nomi solo-app, il comando di avvio usato e l'esito della chiamata.
+Report in `reports/craft-bridge-sweep.json` (default): for every app the two tool lists,
+the app-only names, the startup command used and the outcome of the call.
 
-# Relazioni
+# Relations
 
-- **misura l'effetto di** [Modi dello shim](../architecture/shim-modes.md)
-- **complementare a** [craft-bridge-verify](craft-bridge-verify.md) (che guarda le entry, non le app)
-- **misure raccontate in** [Manuale tecnico](../reference/craft-bridge.md)
+- **it measures the effect of** [Shim modes](../architecture/shim-modes.md)
+- **complementary to** [craft-bridge-verify](craft-bridge-verify.md) (which looks at the entries, not the apps)
+- **the measurements are told in** [Technical manual](../reference/craft-bridge.md)

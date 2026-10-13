@@ -1,41 +1,40 @@
 ---
 type: Protocol
-title: "Canale di controllo delle Crafting Apps"
-description: "Il protocollo JSON-lines che le app aprono con --control: messaggi, credenziale, porte attese e insidie misurate."
+title: "Control channel of the Crafting Apps"
+description: "The JSON-lines protocol the apps open with --control: messages, credential, expected ports and measured pitfalls."
 resource: ../../tools/craft-bridge-ident.py
-tags: [protocollo, porte, canale-di-controllo]
+tags: [protocol, ports, control-channel]
 generated: { by: process:freebuff-buffy, at: 2026-10-13T14:26:01Z }
 status: stable
 sources:
 - resource: ../../tools/craft-bridge-ident.py
-  title: implementazione dell'handshake
+  title: implementation of the handshake
 - resource: ../../tools/craft-bridge-mcp.py
-  title: lo shim che lo usa
+  title: the shim that uses it
 - resource: ../../docs/reference/craft-bridge.md
-  title: Manuale tecnico completo
+  title: complete technical manual
 ---
 
-# Come si presenta
+# What it looks like
 
-Una app avviata con `--control <porta>` apre un socket TCP su `127.0.0.1:porta` e
-parla **JSON-lines**: una riga JSON per messaggio, con `id`, `method`, `params`, e
-una risposta `result` oppure `error`.
+An app started with `--control <port>` opens a TCP socket on `127.0.0.1:port` and speaks
+**JSON-lines**: one JSON line per message, with `id`, `method`, `params`, and a `result`
+or `error` reply.
 
-Prima di fare qualunque domanda si fa un **handshake**: e' lui che dice se dietro la
-porta c'e' una app che parla questo protocollo, un'estraneita' (per esempio un
-server HTTP) o il silenzio. E' la ragione per cui lo shim non ripiega piu' in
-silenzio su un peer muto.
+Before asking anything, a **handshake** is performed: it is what tells whether behind the
+port there is an app speaking this protocol, a stranger (an HTTP server, for instance) or
+silence. That is why the shim no longer falls back silently on a mute peer.
 
-# Credenziale
+# Credential
 
-PhotoCraft pretende un token: l'app lo **scrive lei** in
-`~/.craft-bridge/photocraft.token`, e la config lo passa con
-`--control-token-file`. Il valore non viene mai stampato dagli strumenti: si legge
-solo l'esito dell'`auth`.
+PhotoCraft requires a token: the app **writes it itself** into
+`~/.craft-bridge/photocraft.token`, and the config passes it with
+`--control-token-file`. The value is never printed by the tools: only the outcome of the
+`auth` call is read.
 
-# Porte attese
+# Expected ports
 
-| App | Porta | App | Porta |
+| App | Port | App | Port |
 |---|---|---|---|
 | cadcraft | 7971 | soundcraft | 7977 |
 | deckcraft | 7972 | wordcraft | 7978 |
@@ -44,23 +43,22 @@ solo l'esito dell'`auth`.
 | gridcraft | 7975 | effectcraft | 9877 |
 | photocraft | 7976 | | |
 
-Le ultime tre sono i default documentati dalle rispettive CLI; le altre vengono
-dalla tabella dello shim, che e' una **sola fonte** per config e diagnosi
-(`--dump-apps`).
+The last three are the defaults documented by the respective CLIs; the others come from
+the shim table, which is a **single source** for config and diagnosis (`--dump-apps`).
 
-# Insidie misurate
+# Measured pitfalls
 
-* La fine di un messaggio va riconosciuta **parsando**, non cercando un a capo: le
-  app lasciano un `\n` isolato dopo la risposta precedente, e fermarsi li' faceva
-  leggere un byte vuoto al posto del catalogo (identita' "sconosciuta" a intermittenza).
-* Il catalogo dei comandi e' un corpo grosso (100-120 KB misurati): con il timeout
-  snello dell'handshake, sotto carico la risposta non arrivava in tempo. Per il
-  catalogo la scadenza e' piu' larga.
-* Una credenziale rifiutata fa **chiudere la connessione**: la scrittura successiva
-  alza `ConnectionAbortedError` - vedi [difetto](../findings/auth-refused-crash.md).
+* The end of a message must be recognised by **parsing**, not by looking for a newline:
+  the apps leave a stray `\n` after the previous reply, and stopping there made the code
+  read an empty byte instead of the catalogue (identity "unknown" at intervals).
+* The command catalogue is a large body (100-120 KB measured): with the lean handshake
+  timeout, under load the reply did not arrive in time. For the catalogue the deadline is
+  wider.
+* A refused credential makes the app **close the connection**: the next write raises
+  `ConnectionAbortedError` - see [the defect](../findings/auth-refused-crash.md).
 
-# Relazioni
+# Relations
 
-- **usato da** [Modi dello shim](shim-modes.md) - per decidere il modo e per parlare con l'app
-- **interrogato da** [craft-bridge-ident](../tools/craft-bridge-ident.md) - identita' e build
-- **provato da** [craft-bridge-tests](../tools/craft-bridge-tests.md) - peer muto, peer estraneo, credenziale rifiutata
+- **used by** [Shim modes](shim-modes.md) - to decide the mode and to talk with the app
+- **queried by** [craft-bridge-ident](../tools/craft-bridge-ident.md) - identity and build
+- **proved by** [craft-bridge-tests](../tools/craft-bridge-tests.md) - mute peer, foreign peer, refused credential

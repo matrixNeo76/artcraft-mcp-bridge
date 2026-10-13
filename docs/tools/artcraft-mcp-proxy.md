@@ -1,38 +1,38 @@
 ---
 type: Tool
-title: "artcraft-mcp-proxy - shim di conformita' per l'MCP generativo"
-description: "Riespone i tool dell'MCP generativo ArtCraft con i nomi in camelCase attesi dai client, correggendo i nomi snake_case che alcuni client rifiutano."
+title: "artcraft-mcp-proxy - conformance shim for the generative MCP"
+description: "Re-exposes the ArtCraft generative MCP tools under the camelCase names clients expect, fixing the snake_case names some clients refuse."
 resource: ../../tools/artcraft-mcp-proxy.py
-tags: [strumento, conformita, artcraft]
+tags: [tool, conformance, artcraft]
 generated: { by: process:freebuff-buffy, at: 2026-10-13T14:26:01Z }
 status: stable
 sources:
 - resource: ../../tools/artcraft-mcp-proxy.py
-  title: sorgente
+  title: source
 - resource: ../../install/install-craft-mcp.ps1
-  title: l'installer che lo registra
-- resource: ../../docs/reference/analisi.md
-  title: Analisi dell'ecosistema MCP
+  title: the installer that registers it
+- resource: ../../docs/reference/analysis.md
+  title: MCP ecosystem analysis
 ---
 
-# Cosa fa
+# What it does
 
-Si mette fra il client e l'MCP generativo ArtCraft: inoltra le richieste e riscrive i
-nomi dei tool nella forma attesa dal client. E' lo shim di conformita' citato come
-soluzione del difetto snake_case.
+It sits between the client and the ArtCraft generative MCP: it forwards the requests and
+rewrites the tool names into the shape the client expects. It is the conformance shim
+quoted as the fix for the snake_case defect.
 
-# Come si usa
+# How it is used
 
 ```
-python tools/artcraft-mcp-proxy.py          # server stdio da registrare nella config
+python tools/artcraft-mcp-proxy.py          # stdio server to register in the config
 ```
 
-L'entry viene creata da `install/install-craft-mcp.ps1` (parametro `ProxyScript`), che
-la installa in `%LOCALAPPDATA%\Programs\artcraft-mcp` e la registra nei client
-rilevati.
+The entry is created by `install/install-craft-mcp.ps1` (parameter `ProxyScript`), which
+installs it in `%LOCALAPPDATA%\Programs\artcraft-mcp` and registers it in the detected
+clients.
 
-# Relazioni
+# Relations
 
-- **registrato da** [install-craft-mcp.ps1](../../install/install-craft-mcp.ps1)
-- **contesto in** [Analisi dell'ecosistema](../reference/analisi.md)
-- **riguarda l'MCP generativo**, non il ponte delle app: vedi [Panoramica](../overview.md)
+- **registered by** [install-craft-mcp.ps1](../../install/install-craft-mcp.ps1)
+- **context in** [Ecosystem analysis](../reference/analysis.md)
+- **it concerns the generative MCP**, not the app bridge: see [Overview](../overview.md)

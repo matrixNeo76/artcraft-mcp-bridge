@@ -1,9 +1,9 @@
 ---
 type: Tool
-title: "Strumenti esplorativi: recon, probe, pilot"
-description: "I tre strumenti con cui il ponte e' stato scoperto e poi dimostrato: recon legge i binari, probe interroga un server MCP qualsiasi, pilot guida l'app e salva gli artefatti."
+title: "Exploratory tools: recon, probe, pilot"
+description: "The three tools with which the bridge was discovered and then demonstrated: recon reads the binaries, probe queries any MCP server, pilot drives the app and saves the artifacts."
 resource: ../../tools/craft-bridge-recon.py
-tags: [strumento, esplorazione, recon, probe, pilot]
+tags: [tool, exploration, recon, probe, pilot]
 generated: { by: process:freebuff-buffy, at: 2026-10-13T14:26:01Z }
 status: stable
 sources:
@@ -14,14 +14,19 @@ sources:
 - resource: ../../tools/craft-bridge-pilot.py
   title: pilot
 - resource: ../../docs/reference/craft-bridge.md
-  title: Manuale tecnico completo
+  title: complete technical manual
 ---
 
 # craft-bridge-recon
 
-Legge i binari delle app (read-only, nessuna app avviata) e cerca flag e indizi del
-canale di controllo: e' cosi' che sono emersi `--control`, i nomi delle variabili e
-le porte. `--matrix` mostra solo la presenza, `--all-context` piu' contesto.
+It reads the app binaries (read-only, no app started) and looks for flags and hints of the
+control channel: this is how `--control`, the variable names and the ports came out.
+`--matrix` shows presence only, `--all-context` more context.
+
+Where the app is, the **system** says: recon asks the shim for the folder registered in
+`App Paths` (the same function the bridge uses to find CLI and executable), so an app
+that moves is followed without touching anything; `--root` remains the fallback for apps
+the system does not register - see [Where the app is](../architecture/app-locations.md).
 
 ```
 python tools/craft-bridge-recon.py --app gridcraft --json
@@ -30,9 +35,9 @@ python tools/craft-bridge-recon.py --matrix --needle control
 
 # craft-bridge-probe
 
-Sonda MCP generica: lancia un server qualsiasi, fa `initialize`, `tools/list` e
-facoltativamente una chiamata, e riferisce l'esito in JSON. Serve a distinguere "il
-server non risponde" da "il server risponde ma il tool non esiste".
+A generic MCP probe: it launches any server, performs `initialize`, `tools/list` and
+optionally one call, and reports the outcome as JSON. It is used to tell "the server does
+not answer" from "the server answers but the tool does not exist".
 
 ```
 python tools/craft-bridge-probe.py --cmd "<app>-cli.exe" --args mcp --tool ui_screenshot --tool-args '{"max_side":512}'
@@ -40,8 +45,8 @@ python tools/craft-bridge-probe.py --cmd "<app>-cli.exe" --args mcp --tool ui_sc
 
 # craft-bridge-pilot
 
-Esegue una sequenza di chiamate sull'app aperta e **salva gli artefatti immagine**:
-e' la prova che un agente puo' guidare la finestra, non solo elencarne i tool.
+It runs a sequence of calls on the open app and **saves the image artifacts**: it is the
+proof that an agent can drive the window, not just list its tools.
 
 ```
 python tools/craft-bridge-pilot.py --cmd "<app-cli>" --args mcp \
@@ -49,9 +54,9 @@ python tools/craft-bridge-pilot.py --cmd "<app-cli>" --args mcp \
     --out reports/pilot.json
 ```
 
-# Relazioni
+# Relations
 
-- **recon ha prodotto** [Canale di controllo](../architecture/control-channel.md)
-- **pilot dimostra** [Modi dello shim](../architecture/shim-modes.md) sulla finestra viva
-- **artefatti in** [Report e baseline](../architecture/reports.md)
-- **racconto completo in** [Manuale tecnico](../reference/craft-bridge.md)
+- **recon produced** [Control channel](../architecture/control-channel.md)
+- **pilot demonstrates** [Shim modes](../architecture/shim-modes.md) on the live window
+- **artifacts in** [Reports and baseline](../architecture/reports.md)
+- **the full account in** [Technical manual](../reference/craft-bridge.md)

@@ -1,55 +1,60 @@
 ---
 type: Project Overview
-title: "Craft Bridge - guidare le Crafting Apps nella loro finestra"
-description: "Il ponte che rende complete le Crafting Apps come server MCP: invece di ripiegare su una CLI senza interfaccia, l'app viva viene guidata nel suo canale di controllo."
+title: "Craft Bridge - driving the Crafting Apps inside their own window"
+description: "The bridge that completes the Crafting Apps as MCP servers: instead of falling back to an interface-less CLI, the running app is driven through its control channel."
 resource: ../../README.md
-tags: [bridge, mcp, panoramica]
+tags: [bridge, mcp, overview]
 generated: { by: process:freebuff-buffy, at: 2026-10-13T14:26:01Z }
 status: stable
 sources:
 - resource: ../../README.md
-  title: README del progetto
+  title: project README
 - resource: ../../docs/reference/craft-bridge.md
-  title: Manuale tecnico completo
-- resource: ../../docs/reference/analisi.md
-  title: Analisi dell'ecosistema MCP
+  title: complete technical manual
+- resource: ../../docs/reference/analysis.md
+  title: MCP ecosystem analysis
 ---
 
-# Cos'e'
+# What it is
 
-Le Crafting Apps (CADCraft, DeckCraft, DesignCraft, FilmCraft, GridCraft,
-LightCraft, PhotoCraft, SoundCraft, VectorCraft, WordCraft, EffectCraft) espongono
-una CLI MCP (`<app>-cli.exe mcp`) che funziona **senza interfaccia**. Molti tool
-hanno pero' senso solo sulla finestra viva: disegnare, fotografare la tela,
-muovere un cursore. In headless quei tool spariscono o falliscono.
+The Crafting Apps (CADCraft, DeckCraft, DesignCraft, FilmCraft, GridCraft, LightCraft,
+PhotoCraft, SoundCraft, VectorCraft, WordCraft, EffectCraft) ship an MCP CLI
+(`<app>-cli.exe mcp`) that works **without a user interface**. Many tools, though, only
+make sense on the live window: drawing, capturing the canvas, moving a cursor. In
+headless those tools disappear or fail.
 
-Il ponte aggiunge un secondo modo: l'app viene avviata con `--control <porta>` e il
-server MCP stdio (lo shim) parla con lei su quel canale. Il risultato sono tool che
-agiscono **sulla finestra aperta**.
+The bridge adds a second mode: the app is launched with `--control <port>` and the stdio
+MCP server (the shim) talks to it over that channel. The result is tools that act **on
+the open window**.
 
-# Cosa c'e' dentro
+# What is inside
 
-| Pezzo | Ruolo |
+| Piece | Role |
 |---|---|
-| Shim stdio | la voce che Freebuff vede come server MCP: sceglie bridged o headless |
-| Canale di controllo | protocollo JSON-lines sulle porte 7971-7980 e 9877 |
-| Identita' | chi risponde davvero sulla porta e quale build ci gira |
-| Diagnosi | `doctor`: un verdetto sull'assieme e le azioni per ripararlo |
-| Prove | `verify`, `sweep`, `tests`: misure ripetibili, non dichiarazioni |
+| stdio shim | the voice Freebuff sees as an MCP server: it chooses bridged or headless |
+| Window translator | the PdfCraft entry, which has no bridge: one MCP method = one CLI invocation |
+| Control channel | JSON-lines protocol on ports 7971-7980 and 9877 |
+| Identity | who really answers on the port and which build is running |
+| Diagnosis | `doctor`: one verdict on the assembly and the actions to repair it |
+| Proofs | `verify`, `sweep`, `tests`: repeatable measurements, not claims |
 
-# Stato
+# State
 
-* 11 app su 12 guidabili e verificate dal vivo con una chiamata riuscita.
-* PdfCraft resta l'eccezione strutturale: app guidabile, MCP senza ponte.
-* 13 server MCP in `~/.agents/mcp.json`, verificati uno per uno col comando reale.
-* 4 difetti veri trovati misurando, corretti alla causa e coperti dalla suite di guasti.
-* 11 app su 11 allineate alla release pubblicata dal launcher (feed del 13 ottobre),
-  letto da [craft-bridge-feed](tools/craft-bridge-feed.md): la versione installata non e'
-  solo quella che l'eseguibile dichiara, e' confrontata con quella del fornitore.
+* 11 of 12 apps are driveable and verified live with a successful call.
+* PdfCraft has no bridge flag in its MCP server, but its window is driven all the same:
+  [craft-bridge-ui](tools/craft-bridge-ui.md) exposes the 15 methods the app declares as
+  as many tools, invoking the CLI once per call. Measured live: 15 methods matching the
+  app's own, 192 commands, 107 widgets, a screenshot of the window.
+* 13 MCP servers in `~/.agents/mcp.json`, verified one by one with the real command.
+* 4 real defects found by measuring, fixed at the cause and covered by the fault suite.
+* 12 of 12 apps aligned with the release published by the launcher (feed of 13 October),
+  read by [craft-bridge-feed](tools/craft-bridge-feed.md): the installed version is not
+  just what the executable claims to be, it is compared with the vendor's.
 
-# Relazioni
+# Relations
 
-- **descritto in dettaglio da** [Manuale tecnico](reference/craft-bridge.md) - il testo lungo con tutte le misure
-- **si appoggia a** [Canale di controllo](architecture/control-channel.md) - il protocollo su cui tutto poggia
-- **si verifica con** [Diagnosi e verifica](operations/diagnosis.md) - i comandi che dicono se e' sano
-- **inventario dell'ambiente in** [Analisi dell'ecosistema](reference/analisi.md)
+- **described in detail by** [Technical manual](reference/craft-bridge.md) - the long text with every measurement
+- **rests on** [Control channel](architecture/control-channel.md) - the protocol everything sits on
+- **for the app without a bridge** [craft-bridge-ui](tools/craft-bridge-ui.md) - the PdfCraft window methods as MCP tools
+- **is verified with** [Diagnosis and verification](operations/diagnosis.md) - the commands that say whether it is healthy
+- **environment inventory in** [Ecosystem analysis](reference/analysis.md)

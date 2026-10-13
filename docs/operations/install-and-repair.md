@@ -1,62 +1,65 @@
 ---
 type: Runbook
-title: "Installare e riparare il ponte"
-description: "Da zero a ponte funzionante, e come tornare indietro: installazione delle copie, entry dei connettori, avvio delle app, ripristino headless."
+title: "Install and repair the bridge"
+description: "From nothing to a working bridge, and how to go back: installing the copies, the connector entries, starting the apps, restoring headless."
 resource: ../../tools/craft-bridge-config.py
-tags: [runbook, installazione, ripristino]
+tags: [runbook, installation, restore]
 generated: { by: process:freebuff-buffy, at: 2026-10-13T14:26:01Z }
 status: stable
 sources:
 - resource: ../../tools/craft-bridge-config.py
   title: installer
 - resource: ../../tools/craft-bridge-launch.py
-  title: avvio
+  title: startup
 - resource: ../../docs/reference/craft-bridge.md
-  title: Manuale tecnico completo
+  title: complete technical manual
 ---
 
-# Installare le copie e le entry
+# Install the copies and the entries
 
 ```
-# 1. cosa cambierebbe (nessuna scrittura)
+# 1. what would change (no writing)
 python tools/craft-bridge-config.py
 
-# 2. applicare: copia shim e ident in %LOCALAPPDATA%\Programs\craft-bridge
-#    e riscrive le entry in ~/.agents/mcp.json (backup automatico)
+# 2. apply: copies the shim, ident and the window translator into
+#    %LOCALAPPDATA%\Programs\craft-bridge and rewrites the entries in
+#    ~/.agents/mcp.json (automatic backup)
 python tools/craft-bridge-config.py --apply
 
 # 3. In Freebuff: Connectors -> Refresh
 ```
 
-Le app chiuse restano usable in headless; quelle aperte col canale di controllo
-diventano guidabili.
+Closed apps remain usable in headless; those opened with the control channel become
+driveable.
 
-# Avviare le app col canale attivo
+# Start the apps with the channel active
 
 ```
-python tools/craft-bridge-launch.py                        # tutte le app in config
+python tools/craft-bridge-launch.py                        # every app in the config
 python tools/craft-bridge-launch.py --apps gridcraft --verify
+python tools/craft-bridge-launch.py --apps pdfcraft --verify # the one served by the translator
 ```
 
-PhotoCraft ha bisogno del file del token scritto dall'app
-(`~/.craft-bridge/photocraft.token`): per le altre app basta il primo comando.
+PhotoCraft needs the token file written by the app (`~/.craft-bridge/photocraft.token`):
+for the other apps the first command is enough.
 
-# Tornare indietro
-
-```
-python tools/craft-bridge-config.py --restore    # entry headless, come prima del ponte
-```
-
-# Controllare che sia tutto a posto
+# Going back
 
 ```
-python tools/craft-bridge-doctor.py        # un verdetto sull'assieme
-python tools/craft-bridge-verify.py        # ogni entry col suo comando reale
+python tools/craft-bridge-config.py --restore    # headless entries, as before the bridge
 ```
 
-# Relazioni
+# Checking that everything is in place
 
-- **installa** [craft-bridge-config](../tools/craft-bridge-config.md)
-- **avvia** [craft-bridge-launch](../tools/craft-bridge-launch.md)
-- **spiega i due posti** [Installato, sorgente e MCP globale](../architecture/installation-layout.md)
-- **se qualcosa non torna** [Diagnosi e verifica](diagnosis.md)
+```
+python tools/craft-bridge-doctor.py        # one verdict on the assembly
+python tools/craft-bridge-verify.py        # every entry with its real command
+python tools/craft-bridge-mcp.py --flags   # every CLI confirms the attach flag we declare
+```
+
+# Relations
+
+- **installs** [craft-bridge-config](../tools/craft-bridge-config.md)
+- **starts** [craft-bridge-launch](../tools/craft-bridge-launch.md)
+- **explains the two places** [Installed, source and global MCP](../architecture/installation-layout.md)
+- **if something does not add up** [Diagnosis and verification](diagnosis.md)

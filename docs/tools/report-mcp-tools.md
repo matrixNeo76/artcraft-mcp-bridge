@@ -1,42 +1,43 @@
 ---
 type: Tool
-title: "report-mcp-tools - inventario dei tool dei server"
-description: "Avvia ogni server MCP configurato, fa l'handshake e chiede tools/list: produce l'elenco reale dei tool disponibili, server per server."
+title: "report-mcp-tools - inventory of the servers' tools"
+description: "Starts every configured MCP server, performs the handshake and asks tools/list: it produces the real list of available tools, server by server."
 resource: ../../tools/report-mcp-tools.py
-tags: [strumento, inventario, tool]
+tags: [tool, inventory, tools]
 generated: { by: process:freebuff-buffy, at: 2026-10-13T14:26:01Z }
 status: stable
 sources:
 - resource: ../../tools/report-mcp-tools.py
-  title: sorgente
+  title: source
 - resource: ../../reports/mcp-tools-report.md
-  title: il report prodotto
-- resource: ../../docs/reference/analisi.md
-  title: Analisi dell'ecosistema MCP
+  title: the report it produces
+- resource: ../../docs/reference/analysis.md
+  title: MCP ecosystem analysis
 ---
 
-# Cosa fa
+# What it does
 
-Legge `~/.agents/mcp.json` (la stessa config del pannello Connectors), avvia ogni
-server stdio, fa l'handshake e chiede `tools/list`. Scrive un report Markdown. E' di
-sola lettura: non modifica nessuna configurazione.
+It reads `~/.agents/mcp.json` (the same config the Connectors panel uses), starts every
+stdio server, performs the handshake and asks `tools/list`. It writes a Markdown report.
+It is read-only: it modifies no configuration.
 
-Ultimo esito: **13/13 server connessi, 764 tool** inventariati.
+Last outcome: **13/13 servers connected, 618 tools** inventoried (for `pdfcraft` the 15
+methods of the window: see [craft-bridge-ui](craft-bridge-ui.md)).
 
-# Interfaccia
+# Interface
 
 ```
 python tools/report-mcp-tools.py                       # -> reports/mcp-tools-report.md
-python tools/report-mcp-tools.py --timeout 120 --out reports/miei-tool.md
+python tools/report-mcp-tools.py --timeout 120 --out reports/my-tools.md
 ```
 
-# Perche' serve
+# Why it is needed
 
-La differenza fra "il server risponde" e "il server espone i tool giusti" si vede
-solo qui: e' il modo in cui sono stati contati i tool bridged (per esempio
-`lightcraft 502`, `effectcraft 36`, `cadcraft 14`) e confrontati con gli headless.
+The difference between "the server answers" and "the server exposes the right tools" is
+only visible here: it is how the bridged tools were counted (for instance
+`lightcraft 502`, `effectcraft 36`, `cadcraft 14`) and compared with the headless ones.
 
-# Relazioni
+# Relations
 
-- **inventario citato in** [Analisi dell'ecosistema](../reference/analisi.md)
-- **complementare a** [craft-bridge-sweep](craft-bridge-sweep.md)
+- **the inventory is quoted in** [Ecosystem analysis](../reference/analysis.md)
+- **complementary to** [craft-bridge-sweep](craft-bridge-sweep.md)

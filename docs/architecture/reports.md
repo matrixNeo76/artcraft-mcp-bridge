@@ -1,43 +1,43 @@
 ---
 type: Mechanism
-title: "Report generati e confronto fra esecuzioni"
-description: "Tutti gli artefatti generati stanno in reports/ ed e' il default degli strumenti; la suite confronta da sola l'esecuzione corrente con la precedente."
+title: "Generated reports and comparison between runs"
+description: "Every generated artefact lives in reports/ and that is the tools' default; the suite compares the current run with the previous one by itself."
 resource: ../../reports/craft-bridge-tests.json
-tags: [report, baseline, confronto]
+tags: [report, baseline, comparison]
 generated: { by: process:freebuff-buffy, at: 2026-10-13T14:26:01Z }
 status: stable
 sources:
 - resource: ../../tools/craft-bridge-tests.py
-  title: chi produce il report con confronto
+  title: what produces the report with the comparison
 - resource: ../../reports/craft-bridge-sweep.json
-  title: il report dello sweep
+  title: the sweep report
 ---
 
-# Dove finiscono
+# Where they go
 
-| File | Prodotto da | Contenuto |
+| File | Produced by | Content |
 |---|---|---|
-| `reports/craft-bridge-tests.json` | suite dei guasti | casi, esiti, durata, impronte degli strumenti, confronto |
-| `reports/craft-bridge-tests.md` | suite dei guasti | gli stessi dati leggibili, con la sezione di confronto |
-| `reports/craft-bridge-sweep.json` | sweep | per ogni app: tool headless, tool bridged, nomi solo-app |
-| `reports/mcp-tools-report.md` | report-mcp-tools | inventario dei server e dei loro tool |
-| `reports/photocraft-pilot-report.json` | pilot | i passi della guida dell'app e gli artefatti immagine |
-| `reports/photocraft-live-*.png` | pilot | le immagini catturate dalla finestra viva |
-| `reports/okf-graph.html` | `uvx okfgen visualize docs` | il bundle come grafo interattivo: nodi, relazioni, tipi |
+| `reports/craft-bridge-tests.json` | fault suite | cases, outcomes, duration, tool fingerprints, comparison |
+| `reports/craft-bridge-tests.md` | fault suite | the same data in readable form, with the comparison section |
+| `reports/craft-bridge-sweep.json` | sweep | per app: headless tools, bridged tools, app-only names |
+| `reports/mcp-tools-report.md` | report-mcp-tools | inventory of the servers and their tools |
+| `reports/photocraft-pilot-report.json` | pilot | the steps of the app session and the image artefacts |
+| `reports/photocraft-live-*.png` | pilot | the images captured from the live window |
+| `reports/okf-graph.html` | `uvx okfgen visualize docs` | the bundle as an interactive graph: nodes, relations, types |
 
-Gli strumenti scrivono li' per **default**, non nella cartella da cui li invochi:
-cosi' due esecuzioni fatte da posti diversi restano confrontabili.
+The tools write there by **default**, not into the folder you invoke them from: that way
+two runs made from different places stay comparable.
 
-# Il confronto
+# The comparison
 
-Il report della suite e' anche la sua baseline: l'esecuzione corrente legge il json
-che sta per sovrascrivere e ne deduce le differenze - casi cambiati d'esito,
-comparse, sparizioni, impronte degli strumenti - che finiscono nel markdown e nel
-campo `changes` del json. La durata e' contesto, non una differenza. Per confrontare
-due report qualsiasi: `--compare vecchio.json`.
+The suite report is also its own baseline: the current run reads the json it is about to
+overwrite and derives the differences - cases whose outcome changed, appeared or
+disappeared, tool fingerprints - which end up in the markdown and in the `changes` field of
+the json. Duration is context, not a difference. To compare any two reports:
+`--compare old.json`.
 
-# Relazioni
+# Relations
 
-- **prodotto da** [craft-bridge-tests](../tools/craft-bridge-tests.md)
-- **prodotto da** [craft-bridge-sweep](../tools/craft-bridge-sweep.md)
-- **prodotto da** [report-mcp-tools](../tools/report-mcp-tools.md)
+- **produced by** [craft-bridge-tests](../tools/craft-bridge-tests.md)
+- **produced by** [craft-bridge-sweep](../tools/craft-bridge-sweep.md)
+- **produced by** [report-mcp-tools](../tools/report-mcp-tools.md)

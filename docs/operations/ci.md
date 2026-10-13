@@ -1,85 +1,87 @@
 ---
 type: Runbook
-title: "Integrazione continua: cosa controlla ogni push"
-description: "Il workflow .github/workflows/checks.yml: controlli portabili su un runner hosted, suite completa su un runner self-hosted, e cosa significa --ci."
+title: "Continuous integration: what every push checks"
+description: "The .github/workflows/checks.yml workflow: portable checks on a hosted runner, the full suite on a self-hosted runner, and what --ci means."
 resource: "../../.github/workflows/checks.yml"
-tags: [ci, workflow, controlli, badge]
+tags: [ci, workflow, checks, badge]
 generated: { by: process:freebuff-buffy, at: 2026-10-13T14:47:19Z }
 status: stable
 sources:
 - resource: "../../.github/workflows/checks.yml"
-  title: "Il workflow"
+  title: "the workflow"
 - resource: "../../tools/craft-bridge-tests.py"
-  title: "La suite che il workflow esegue"
+  title: "the suite the workflow runs"
 - resource: "../../README.md"
-  title: "Badge di stato"
+  title: "status badge"
 ---
 
-# Perche' due job
+# Why two jobs
 
-La suite di questo progetto **prova una macchina**, non solo del codice: `stato pulito`
-pretende che `doctor` non abbia azioni da fare, `shim installato stantio` tocca la copia
-installata, gli altri casi parlano alle app. Su un runner GitHub-hosted non c'e' nulla di
-tutto questo, quindi la suite intera li' non puo' che fallire - e un badge rosso per
-sempre non dice niente a nessuno.
+The suite of this project **exercises a machine**, not just code: `stato pulito` demands
+that `doctor` has no actions to take, `shim installato stantio` touches the installed copy,
+the other cases talk to the apps. On a GitHub-hosted runner none of that exists, so the
+whole suite there can only fail - and a badge that is red forever tells nobody anything.
 
-Percio' il workflow ha due job:
+So the workflow has two jobs:
 
-| Job | Dove | Cosa fa |
+| Job | Where | What it does |
 |---|---|---|
-| `controlli` | `windows-latest` (GitHub) | tutto cio' che non dipende dalla macchina, piu' la suite con `--ci` |
-| `ponte-completo` | runner **self-hosted** con le app | `doctor` e la suite intera, dove il ponte esiste davvero |
+| `controlli` | `windows-latest` (GitHub) | everything that does not depend on the machine, plus the suite with `--ci` |
+| `ponte-completo` | a **self-hosted** runner with the apps | `doctor` and the whole suite, where the bridge really exists |
 
-Il secondo si attiva impostando la variabile di repository `CRAFTBRIDGE_SELF_HOSTED=1`
-(Settings → Secrets and variables → Actions → Variables) e registrando un runner con le
-etichette `self-hosted`, `windows`, `craftbridge`. Se la variabile non c'e', il job viene
-saltato e non colora il badge.
+The second one is enabled by setting the repository variable `CRAFTBRIDGE_SELF_HOSTED=1`
+(Settings → Secrets and variables → Actions → Variables) and registering a runner with the
+labels `self-hosted`, `windows`, `craftbridge`. If the variable is absent, the job is
+skipped and does not colour the badge.
 
-# Gli step del job hosted
+# The steps of the hosted job
 
-| Step | Cosa verifica | Perche' |
+| Step | What it verifies | Why |
 |---|---|---|
-| Sintassi | `py_compile` su tutti gli strumenti | un errore di sintassi non deve arrivare a un agente che li invoca |
-| Interfacce | `--help` di ogni strumento con `argparse` | l'interfaccia esiste e risponde (i server stdio sono saltati: un `--help` li farebbe partire in attesa di stdin) |
-| Tabella delle app | le 11 app e le porte documentate | la tabella e' una sola fonte: config e diagnosi leggono questa |
-| Installer deterministico | due giri di `--json` identici, 11 entry | idempotenza: due esecuzioni non devono produrre piani diversi |
-| Bundle OKF | `uvx --from "okfgen==0.1.3" okfgen validate docs --strict` | la documentazione resta consumabile da un altro strumento; versione fissata per non dipendere dal rilascio piu' recente |
-| Suite | `craft-bridge-tests.py --static --ci` | i casi eseguibili senza ponte, con i salti motivati |
-| Artefatto | `reports/craft-bridge-tests.*` | il report della run resta scaricabile, anche se la run fallisce |
+| Syntax | `py_compile` on every tool | a syntax error must not reach an agent that invokes them |
+| Interfaces | `--help` of every tool with `argparse` | the interface exists and answers (stdio servers are skipped: a `--help` would start them waiting for stdin) |
+| App table | the 11 documented apps and ports | the table is a single source: config and diagnosis read this one |
+| Deterministic installer | two rounds of `--json` identical, 11 entries | idempotence: two runs must not produce different plans |
+| OKF bundle | `uvx --from "okfgen==0.1.3" okfgen validate docs --strict` | the documentation stays consumable by another tool; the version is pinned so it does not depend on the newest release |
+| Suite | `craft-bridge-tests.py --static --ci` | the cases runnable without the bridge, with motivated skips |
+| Artifact | `reports/craft-bridge-tests.*` | the run report stays downloadable, even if the run fails |
 
-# Cosa significa `--ci`
+# What `--ci` means
 
-`--ci` salta i casi che richiedono il ponte **spiegando perche'** (`ambiente assente su
-questo runner: config assente (...)`), invece di fallire. La regola e' stretta: cambia
-cosa e' un *ambiente assente*, non cosa e' un *guasto*.
+`--ci` skips the cases that require the bridge **explaining why** (`ambiente assente su
+questo runner: config assente (...)`), instead of failing. The rule is strict: it changes
+what an *absent environment* is, not what a *fault* is.
 
-La prova di questa distinzione si fa in tre modi, tutti eseguiti prima di pubblicarla:
+The distinction is proved in three ways, all run before publishing it:
 
-1. su una macchina con il ponte, `--static --ci` da' **6/6 e nessun salto**;
-2. con l'ambiente puntato a una cartella vuota, da' **1 passato + 5 saltati** ed esce 0;
-3. con lo shim installato manomesso (un byte in piu'), da' **FAIL** ed esce 1 anche con
-   `--ci`.
+1. on a machine with the bridge, `--static --ci` gives **19/19 and no skips** (23/23 on the
+   whole suite);
+2. on a machine without a bridge (an empty environment: no connector config, no installed
+   copies), it gives **11 passed + 8 skipped** and exits 0, with the reason on every skip;
+3. with a real fault injected - one extra byte in the installed copy of the translator -
+   the same command gives **FAIL** and exits 1 even with `--ci`: the mode does not hide
+   faults, it only stops calling the absence of a bridge a fault.
 
-# Come si provano gli step senza pubblicare
+# How the steps are proved without publishing
 
-Gli step sono stati eseguiti in locale **estraendoli dal file del workflow**
-(`powershell -NoProfile -ExecutionPolicy Bypass -File step.ps1`), cosi' cio' che gira in CI
-e cio' che e' stato verificato sono lo stesso testo; poi la CI stessa, al primo push, ha
-finito il lavoro. Le tre cose che questo ha trovato:
+The steps were run locally **by extracting them from the workflow file**
+(`powershell -NoProfile -ExecutionPolicy Bypass -File step.ps1`), so what runs in CI and
+what was verified are the same text; then CI itself, on the first push, finished the job.
+The three things this found:
 
-* in PowerShell `"$slug: ..."` viene letto come **variabile con drive**
-  (`InvalidVariableReferenceWithDrive`): va scritto `"${slug}: ..."`. Lo step moriva con
-  quell'errore invece di dire cosa non andava;
-* il conteggio delle proprieta' di un oggetto JSON richiede `Measure-Object`, non `.Count`
-  (che stampava un `1` per riga);
-* **`uvx` non esiste sui runner GitHub**: serve il passo `astral-sh/setup-uv`, e la versione
-  del validatore va fissata (`okfgen==0.1.3`), altrimenti un suo rilascio puo' far fallire
-  un push in cui non e' cambiato niente. Questo l'ha trovato la CI stessa, al primo push.
+* in PowerShell `"$slug: ..."` is read as a **variable with a drive**
+  (`InvalidVariableReferenceWithDrive`): it must be written `"${slug}: ..."`. The step died
+  with that error instead of saying what was wrong;
+* counting the properties of a JSON object needs `Measure-Object`, not `.Count` (which
+  printed a `1` per line);
+* **`uvx` does not exist on GitHub runners**: the `astral-sh/setup-uv` step is needed, and
+  the validator version must be pinned (`okfgen==0.1.3`), otherwise one of its releases can
+  fail a push in which nothing changed. CI itself found this, on the first push.
 
-# Relazioni
+# Relations
 
-- **esegue** [craft-bridge-tests](../tools/craft-bridge-tests.md) in modalita' `--ci`
-- **esegue** [craft-bridge-doctor](../tools/craft-bridge-doctor.md) nel job self-hosted
-- **valida** [Report e baseline](../architecture/reports.md) come artefatto della run
+- **it runs** [craft-bridge-tests](../tools/craft-bridge-tests.md) in `--ci` mode
+- **it runs** [craft-bridge-doctor](../tools/craft-bridge-doctor.md) in the self-hosted job
+- **it validates** [Reports and baseline](../architecture/reports.md) as the run artifact
 - **badge in** [README](../../README.md)
-- **regole di sicurezza in** [Regole di sicurezza](safety-rules.md)
+- **safety rules in** [Safety rules](safety-rules.md)

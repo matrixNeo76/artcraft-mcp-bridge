@@ -1,65 +1,101 @@
 ---
 type: Tool
-title: "craft-bridge-doctor - un verdetto sull'assieme"
-description: "Controlla repo, copie installate, entry di config, eseguibili, credenziali e build in ascolto; in fondo elenca le azioni che risolvono i problemi trovati."
+title: "craft-bridge-doctor - one verdict on the assembly"
+description: "Checks repo, installed copies, config entries, executables, PdfCraft window, credentials and listening builds; at the end it lists the actions that fix the problems found."
 resource: ../../tools/craft-bridge-doctor.py
-tags: [strumento, diagnosi, verdetto]
+tags: [tool, diagnosis, verdict]
 generated: { by: process:freebuff-buffy, at: 2026-10-13T14:26:01Z }
 status: stable
 sources:
 - resource: ../../tools/craft-bridge-doctor.py
-  title: sorgente
+  title: source
 - resource: ../../docs/reference/craft-bridge.md
-  title: Manuale tecnico completo
+  title: complete technical manual
 - resource: ../../tools/craft-bridge-tests.py
-  title: La suite che prova gli strumenti
+  title: the suite that exercises the tools
 ---
 
-# Cosa fa
+# What it does
 
-Otto controlli in un comando, ognuno `ok` / `FIX` / `nota`: repo, copie installate,
-entry di config, percorsi citati, eseguibili delle app, **quello che il fornitore
-pubblica** contro quello installato, credenziali, e - sulle porte in ascolto - chi
-risponde e quale build ci gira.
+Ten checks in one command, each `ok` / `FIX` / `nota`: repo, installed copies, config
+entries, the paths they mention, the app executables, **where the app is** (the
+`App Paths` registry against the table), **the attach flag** (does the CLI help name what
+the table uses?), **the PdfCraft window** (does the
+[translator](../tools/craft-bridge-ui.md) answer? and are its methods the ones the app
+declares?), **what the vendor publishes** against what is installed, credentials, and - on
+the listening ports - who answers and which build runs there.
 
-Degli otto, uno solo non e' un guasto possibile: la riga `pubblicato`. Un'app indietro
-rispetto alla release del launcher resta una `nota` con l'azione "aggiorna dal launcher",
-perche' il ponte funziona anche con la versione precedente; un launcher assente non
-cambia il verdetto, perche' senza feed non c'e' un termine di paragone. Il dettaglio di
-quel confronto sta in [craft-bridge-feed](craft-bridge-feed.md).
+The comparison with the published release looks at the apps the bridge **serves**, not
+only the ones of the shim: the translator's ones are there too (`pdfcraft`).
 
-Poi mette in fondo **solo i problemi, numerati, con l'azione che li risolve**. Il
-doctor non modifica niente da solo: consiglia, e l'azione la esegui tu (o la suite).
+The installed copies it watches are **three**, not two: `craft-bridge-mcp.py`,
+`craft-bridge-ident.py` and `craft-bridge-ui.py` (the PdfCraft translator). The
+`shim installato` check accuses a repo file newer than the installed one for the third as
+well, and the action is always `--apply`.
 
-# Interfaccia
+Two of these are not possible faults. The `pubblicato` line: an app behind the launcher's
+release stays a `nota` with the action "update from the launcher", because the bridge
+works with the previous version too, and a missing launcher does not change the verdict
+because without a feed there is no term of comparison (details in
+[craft-bridge-feed](craft-bridge-feed.md)). And the `posizione app` line: when the
+registry and the hand-written table point at different folders the line says which ones,
+and the action is **align the table** - the path actually used stays the system's - see
+[Where the app is](../architecture/app-locations.md).
+
+The `flag di aggancio` line is the most direct of the three: the bridge runs
+`<cli> mcp --connect PORT` at every start, so the flag the table declares **must** be the
+one the CLI accepts. Here the question is put to the CLI help (one per app, ~0.7 s in
+total): if the table claims an option the help does not name, or if the help names one the
+table does not use, it is a `FIX` with the action `--flags`; a CLI that prints no help is
+not an `ok`, it is a `nota` that says so. Measured: **12/12** confirmed - 11 attaches and
+1 for translation. Details in [craft-bridge-mcp](craft-bridge-mcp.md).
+
+The `finestra pdfcraft` line has three outcomes too, and the reason is the same: that the
+window is not there is **not** a fault (the entry falls back to the vendor's headless
+server), so there the verdict is a `nota` with the action to open it; it is a `FIX`
+instead if the translator does not answer at all, because then the entry does not start.
+When the window is there, the line compares the **15 methods** of the table with the ones
+the app declares: it is the only thing no one else can do, because the table is a copy of
+what the app says it can do.
+
+Then at the end it puts **only the problems, numbered, with the action that fixes each**.
+The doctor changes nothing by itself: it advises, and you run the action (or the suite
+does).
+
+# Interface
 
 ```
-python tools/craft-bridge-doctor.py                # tutto, comprese le app aperte
-python tools/craft-bridge-doctor.py --no-live      # salta le porte (~1 s)
+python tools/craft-bridge-doctor.py                # everything, open apps included
+python tools/craft-bridge-doctor.py --no-live      # skips the ports (~1 s)
 python tools/craft-bridge-doctor.py --json         # checks / problems / actions
 python tools/craft-bridge-doctor.py --install-dir <dir> --config <file>
-python tools/craft-bridge-doctor.py --feed-dir <cartella>   # feed del launcher di prova
+python tools/craft-bridge-doctor.py --feed-dir <folder>   # test launcher feed
+python tools/craft-bridge-doctor.py --apps-file table.json  # test table (diagnosis)
 ```
 
-# Esiti
+# Exit codes
 
-| Uscita | Significato |
+| Exit | Meaning |
 |---|---|
-| 0 | niente da sistemare |
-| 1 | almeno un problema (le azioni dicono quali) |
-| 2 | errore d'uso |
-| 3 | config o tabella delle app illeggibili |
+| 0 | nothing to fix |
+| 1 | at least one problem (the actions say which) |
+| 2 | usage error |
+| 3 | unreadable config or app table |
 
-# Costo
+# Cost
 
-~0,9 s con le app chiuse, confronto con il feed compreso (le versioni degli eseguibili
-si leggono una volta sola e le usano due controlli); qualche secondo in piu' con app
-aperte (una lettura del catalogo per porta occupata).
+~2.7 s with the apps closed: ~0.8 s for the twelve CLI helps (one per app served by the
+bridge, the most expensive part), and the rest for the comparison with the feed and the
+executable versions, which are read once and used by two checks. A few seconds more with
+apps open (one catalogue read per occupied port).
 
-# Relazioni
+# Relations
 
-- **usa** [craft-bridge-ident](craft-bridge-ident.md) per la domanda sulla build
-- **usa** [craft-bridge-config](craft-bridge-config.md) per le entry attese (una sola fonte)
-- **usa** [craft-bridge-feed](craft-bridge-feed.md) per la release pubblicata, contro la build installata
-- **verificato da** [craft-bridge-tests](craft-bridge-tests.md) - ogni `FIX` provato iniettando il guasto
-- **nel runbook** [Diagnosi e verifica](../operations/diagnosis.md)
+- **uses** [craft-bridge-ident](craft-bridge-ident.md) for the question about the build
+- **uses** [craft-bridge-config](craft-bridge-config.md) for the expected entries (a single source)
+- **uses** [craft-bridge-feed](craft-bridge-feed.md) for the published release, against the installed build
+- **asks the shim** [craft-bridge-mcp](craft-bridge-mcp.md) for the declared attach flag, and the CLI whether it is true
+- **watches** [craft-bridge-ui](craft-bridge-ui.md) - installed copy and catalogue of the PdfCraft window
+- **it takes the paths from** [Where the app is](../architecture/app-locations.md) - the system registry, with the table as confirmation
+- **verified by** [craft-bridge-tests](craft-bridge-tests.md) - every `FIX` proved by injecting the fault
+- **in the runbook** [Diagnosis and verification](../operations/diagnosis.md)

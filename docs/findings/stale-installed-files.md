@@ -1,45 +1,46 @@
 ---
 type: Finding
-title: "File installati non allineati al sorgente"
-description: "La config copiava shim e ident solo se una entry cambiava: con le entry a posto, l'installato restava vecchio mentre il sorgente andava avanti."
+title: "Installed files not aligned with the source"
+description: "The config copied shim and ident only if an entry changed: with the entries in place, the installed copy stayed old while the source moved on."
 resource: ../../tools/craft-bridge-config.py
-tags: [difetto, installazione, deriva]
+tags: [defect, installation, drift]
 generated: { by: process:freebuff-buffy, at: 2026-10-13T14:26:01Z }
 status: stable
 sources:
 - resource: ../../tools/craft-bridge-config.py
-  title: il codice corretto
+  title: the fixed code
 - resource: ../../docs/architecture/installation-layout.md
-  title: i due posti
+  title: the two places
 - resource: ../../tools/craft-bridge-tests.py
-  title: La suite che prova gli strumenti
+  title: the suite that exercises the tools
 ---
 
-# Sintomo
+# Symptom
 
-Con 11 entry gia' a posto, `craft-bridge-config.py` diceva «da aggiornare (0)» e la
-copia installata dello shim restava quella vecchia: hash diversi, misurati.
+With 11 entries already in place, `craft-bridge-config.py` said «da aggiornare (0)» and the
+installed copy of the shim stayed the old one: different hashes, measured.
 
-# Causa
+# Cause
 
-La copia dei file era legata **all'evento** "una entry e' cambiata", non allo stato
-dei file. Due cose diverse che sembravano la stessa.
+Copying the files was tied to the **event** "an entry changed", not to the state of the
+files. Two different things that looked like the same one.
 
-# Correzione
+# Fix
 
-L'installer confronta i **byte** dei file e li riallinea quando serve, entry cambiate
-o no; e installa accanto allo shim anche `craft-bridge-ident.py`, che serve alla
-domanda sulla build. Idempotente: al secondo giro non riscrive nulla.
+The installer compares the **bytes** of the files and realigns them when needed, entries
+changed or not; and it installs `craft-bridge-ident.py` next to the shim as well, since it
+is needed for the question about the build. Idempotent: on the second run it writes
+nothing.
 
-# Chi se ne accorge
+# Who notices
 
-`craft-bridge-doctor.py`: la riga `shim installato` confronta le impronte e dice
-`FIX` con l'azione `--apply`. La [suite dei guasti](../tools/craft-bridge-tests.md)
-copre il caso iniettando un byte in piu' nella copia installata e pretendendo che
-l'azione indicata la ripari.
+`craft-bridge-doctor.py`: the `shim installato` line compares the fingerprints and says
+`FIX` with the `--apply` action. The [fault suite](../tools/craft-bridge-tests.md) covers
+the case by injecting one extra byte into the installed copy and demanding that the
+indicated action repairs it.
 
-# Relazioni
+# Relations
 
-- **regola in** [Installato, sorgente e MCP globale](../architecture/installation-layout.md)
-- **rilevato da** [craft-bridge-doctor](../tools/craft-bridge-doctor.md)
-- **collegato a** [credenziale rifiutata](auth-refused-crash.md) - e' li' che e' emerso la prima volta
+- **rule in** [Installed, source and global MCP](../architecture/installation-layout.md)
+- **detected by** [craft-bridge-doctor](../tools/craft-bridge-doctor.md)
+- **linked to** [refused credential](auth-refused-crash.md) - it first surfaced there

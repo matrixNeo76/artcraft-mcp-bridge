@@ -1,59 +1,59 @@
 ---
 type: Tool
-title: "craft-bridge-ident - chi risponde e quale build"
-description: "Risponde a due domande: chi ascolta su una porta (app riconosciuta dal catalogo dei comandi) e quale versione ci gira (PID, eseguibile, riga di avvio)."
+title: "craft-bridge-ident - who answers and which build"
+description: "Answers two questions: who is listening on a port (an app recognised by its command catalogue) and which version is running there (PID, executable, command line)."
 resource: ../../tools/craft-bridge-ident.py
-tags: [strumento, identita, build]
+tags: [tool, identity, build]
 generated: { by: process:freebuff-buffy, at: 2026-10-13T14:26:01Z }
 status: stable
 sources:
 - resource: ../../tools/craft-bridge-ident.py
-  title: sorgente
+  title: source
 - resource: ../../docs/architecture/identity.md
-  title: il meccanismo
+  title: the mechanism
 - resource: ../../docs/reference/craft-bridge.md
-  title: Manuale tecnico completo
+  title: complete technical manual
 ---
 
-# Cosa fa
+# What it does
 
-Apre il canale, fa l'handshake, chiede il catalogo dei comandi e confronta; legge
-poi il processo in ascolto per la build. E' il perito che `doctor`, `launch` e lo
-shim interrogano quando c'e' un dubbio su chi sta parlando.
+It opens the channel, performs the handshake, asks for the command catalogue and compares
+it; then it reads the listening process for the build. It is the expert that `doctor`,
+`launch` and the shim question when there is a doubt about who is talking.
 
-# Interfaccia
+# Interface
 
 ```
-python tools/craft-bridge-ident.py --slug gridcraft        # una app (porta dedotta)
-python tools/craft-bridge-ident.py --all                   # tutte le porte di ogni app
+python tools/craft-bridge-ident.py --slug gridcraft        # one app (port inferred)
+python tools/craft-bridge-ident.py --all                   # every port of every app
 python tools/craft-bridge-ident.py --all --json
-python tools/craft-bridge-ident.py --slug gridcraft --expect-version 0.6.1   # uscita 1 se diversa
-python tools/craft-bridge-ident.py --slug gridcraft --record                  # registra l'impronta
+python tools/craft-bridge-ident.py --slug gridcraft --expect-version 0.6.1   # exit 1 if different
+python tools/craft-bridge-ident.py --slug gridcraft --record                  # records the fingerprint
 ```
 
-| Opzione | Significato |
+| Option | Meaning |
 |---|---|
-| `--slug` / `--port` | bersaglio singolo |
-| `--all` | tutte le app della config |
-| `--config` | config da usare (default `~/.agents/mcp.json`) |
-| `--token-file`, `--token-field` | credenziale PhotoCraft (`token` o `key`) |
-| `--timeout`, `--wait` | attesa della risposta / della comparsa del canale |
-| `--no-identity`, `--no-build`, `--build-only` | selezionano la domanda |
-| `--expect-version` | pretende una versione precisa |
-| `--record` | scrive l'impronta in `~/.craft-bridge/builds.json` |
-| `--json` | solo JSON |
+| `--slug` / `--port` | a single target |
+| `--all` | every app in the config |
+| `--config` | config to use (default `~/.agents/mcp.json`) |
+| `--token-file`, `--token-field` | PhotoCraft credential (`token` or `key`) |
+| `--timeout`, `--wait` | wait for the answer / for the channel to appear |
+| `--no-identity`, `--no-build`, `--build-only` | they select the question |
+| `--expect-version` | demands an exact version |
+| `--record` | writes the fingerprint to `~/.craft-bridge/builds.json` |
+| `--json` | JSON only |
 
-# Esiti
+# Exit codes
 
-| Uscita | Significato |
+| Exit | Meaning |
 |---|---|
-| 0 | peer riconosciuto, build coerente |
-| 1 | porta chiusa / peer estraneo / app sbagliata / build diversa |
-| 2 | errore d'uso |
-| 3 | config o tabella illeggibili |
+| 0 | peer recognised, build consistent |
+| 1 | port closed / foreign peer / wrong app / different build |
+| 2 | usage error |
+| 3 | unreadable config or table |
 
-# Relazioni
+# Relations
 
-- **meccanismo in** [Identita' e build](../architecture/identity.md)
-- **usato da** [craft-bridge-doctor](craft-bridge-doctor.md), [craft-bridge-launch](craft-bridge-launch.md)
-- **provato da** [craft-bridge-tests](craft-bridge-tests.md)
+- **the mechanism in** [Identity and build](../architecture/identity.md)
+- **used by** [craft-bridge-doctor](craft-bridge-doctor.md), [craft-bridge-launch](craft-bridge-launch.md)
+- **proved by** [craft-bridge-tests](craft-bridge-tests.md)

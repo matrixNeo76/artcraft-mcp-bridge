@@ -1,141 +1,143 @@
 ---
 type: Tool
-title: "craft-bridge-feed - cosa il fornitore pubblica, contro cosa e' installato"
-description: "Legge il feed del launcher di ArtCraft (release, repository di provenienza, sha256 dei pacchetti) e lo confronta con la build installata; con --bytes confronta l'eseguibile installato con quello dentro il pacchetto pubblicato, byte per byte."
+title: "craft-bridge-feed - what the vendor publishes, against what is installed"
+description: "Reads the ArtCraft launcher feed (releases, source repository, package sha256) and compares it with the installed build; with --bytes it compares the installed executable with the one inside the published package, byte for byte."
 resource: ../../tools/craft-bridge-feed.py
-tags: [strumento, release, confronto, launcher]
+tags: [tool, releases, comparison, launcher]
 generated: { by: process:freebuff-buffy, at: 2026-10-13T18:10:00Z }
 status: stable
 sources:
 - resource: ../../tools/craft-bridge-feed.py
-  title: sorgente
+  title: source
 - resource: ../../tools/craft-bridge-ident.py
-  title: da dove viene la build installata
+  title: where the installed build comes from
 - resource: ../../tools/craft-bridge-doctor.py
-  title: chi lo interroga dentro il verdetto
+  title: who queries it inside the verdict
 ---
 
-# Il problema
+# The problem
 
-La versione di un eseguibile dice cosa quell'eseguibile **dichiara** di essere. Non dice
-se e' la release che il fornitore distribuisce: due build con lo stesso numero di
-versione sono indistinguibili, ed e' un limite dichiarato del ponte. Il launcher di
-ArtCraft pero' tiene sul disco l'elenco che usa per aggiornare le app, e in quell'elenco
-c'e' la risposta.
+The version of an executable says what that executable **claims** to be. It does not say
+whether it is the release the vendor distributes: two builds with the same version number
+are indistinguishable, and that is a declared limit of the bridge. The ArtCraft launcher,
+though, keeps the list it uses to update the apps on disk, and the answer is in that list.
 
-# Da dove vengono le due risposte
+# Where the two answers come from
 
-| Lato | Dove sta | Cosa dice |
+| Side | Where it is | What it says |
 |---|---|---|
-| **pubblicato** | `%LOCALAPPDATA%\ArtCraft Launcher\feed.json`, con `releases.json` accanto | repository di provenienza, ultima release (versione, tag, data), e per ogni artefatto sistema, architettura, tipo di pacchetto e **sha256** |
-| **installato** | tabella dello shim, letta da [craft-bridge-ident](craft-bridge-ident.md) | versione dichiarata dall'eseguibile di config, oppure l'impronta registrata la prima volta che l'app e' stata vista girare |
+| **published** | `%LOCALAPPDATA%\ArtCraft Launcher\feed.json`, with `releases.json` beside it | source repository, latest release (version, tag, date), and per artifact system, architecture, package type and **sha256** |
+| **installed** | the shim table, read by [craft-bridge-ident](craft-bridge-ident.md) | version declared by the config executable, or the fingerprint recorded the first time the app was seen running |
 
-Il confronto e' una funzione pura: tabella, feed e versioni installate entrano, righe
-escono. Le prove la esercitano con un feed finto, quindi senza rete e senza app.
+The comparison is a pure function: table, feed and installed versions go in, lines come
+out. The tests exercise it with a fake feed, so with no network and no apps.
 
-# Interfaccia
+# Interface
 
 ```
-python tools/craft-bridge-feed.py                 # installata contro pubblicata
-python tools/craft-bridge-feed.py --packages      # anche i pacchetti per questo sistema
-python tools/craft-bridge-feed.py --downloads     # e i byte dei pacchetti gia' scaricati
-python tools/craft-bridge-feed.py --bytes         # la CLI installata contro quella nel pacchetto
-python tools/craft-bridge-feed.py --download soundcraft   # scarica quel pacchetto e confronta
+python tools/craft-bridge-feed.py                 # installed against published
+python tools/craft-bridge-feed.py --packages      # the packages for this system too
+python tools/craft-bridge-feed.py --downloads     # and the bytes of the packages already downloaded
+python tools/craft-bridge-feed.py --bytes         # the installed CLI against the one in the package
+python tools/craft-bridge-feed.py --download soundcraft   # downloads that package and compares
 python tools/craft-bridge-feed.py --json
-python tools/craft-bridge-feed.py --feed-dir <cartella>   # feed di prova, o altro disco
+python tools/craft-bridge-feed.py --feed-dir <folder>   # test feed, or another disk
 ```
 
-# La domanda che la versione non puo' rispondere
+# The question the version cannot answer
 
-`--bytes` confronta il `<slug>-cli.exe` installato con il file omonimo dentro il
-pacchetto pubblicato. Sono tre domande in fila, e ognuna puo' fermare le altre:
+`--bytes` compares the installed `<slug>-cli.exe` with the file of the same name inside the
+published package. They are three questions in a row, and each one can stop the others:
 
-| Passo | Se non torna |
+| Step | If it does not add up |
 |---|---|
-| l'archivio sul disco e' quello pubblicato? (`sha256` del feed) | `FIX byte <slug>`: l'archivio non e' quello pubblicato, si cancella e si riscarica |
-| la CLI installata c'e'? | `nota`: niente da confrontare, e il perche' e' scritto |
-| il file dentro l'archivio e' identico a quello installato? | `FIX byte <slug>`: l'eseguibile installato non e' quello pubblicato — **questa e' la sola risposta che dice "questa e' la release" invece di "dichiara di esserla"** |
+| is the archive on disk the published one? (`sha256` from the feed) | `FIX byte <slug>`: the archive is not the published one, delete it and download it again |
+| is the installed CLI there? | `nota`: nothing to compare, and the reason is written |
+| is the file inside the archive identical to the installed one? | `FIX byte <slug>`: the installed executable is not the published one — **this is the only answer that says "this is the release" instead of "it claims to be it"** |
 
-Gli archivi si cercano in `~/.craft-bridge/releases` e nella cartella dei download del
-launcher. Se non ci sono, la riga dice **quale** file manca, **quanto** pesa e il
-comando esatto per prenderlo: scaricarli tutti insieme sarebbero centinaia di MB, e
-un'app alla volta e' una scelta, non una limitazione tecnica.
+The archives are looked for in `~/.craft-bridge/releases` and in the launcher's downloads
+folder. If they are not there, the line says **which** file is missing, **how big** it is
+and the exact command to fetch it: downloading them all together would be hundreds of MB,
+and one app at a time is a choice, not a technical limitation.
 
-# Cosa si puo' aprire
+# What can be opened
 
-| Tipo di pacchetto | Si legge? |
+| Package type | Can it be read? |
 |---|---|
-| `cli_zip` (archivio della sola CLI) | si', ed e' il primo che si sceglie quando c'e' — ma e' pubblicato **solo per macOS** |
-| `portable_zip`, `tar_gz` | si': su Windows la CLI sta **dentro** il pacchetto portabile, quindi e' l'unico che risponde |
-| `msi`, `dmg`, `deb`, `rpm`, `flatpak`, `app_image` | no: servono strumenti esterni, e lo strumento lo **dice** invece di fingere di aver confrontato |
+| `cli_zip` (archive of the CLI alone) | yes, and it is the first one chosen when present — but it is published **for macOS only** |
+| `portable_zip`, `tar_gz` | yes: on Windows the CLI sits **inside** the portable package, so it is the only one that answers |
+| `msi`, `dmg`, `deb`, `rpm`, `flatpak`, `app_image` | no: they need external tools, and the tool **says so** instead of pretending it compared them |
 
-# Cosa distingue, in concreto
+# What it distinguishes, concretely
 
-| Riga | Significato |
+| Line | Meaning |
 |---|---|
-| `0.8.2 = 0.8.2 (storytold/photocraft, installata da eseguibile di config)` | allineata, e la fonte della versione installata e' dichiarata |
-| `0.6.2 < 0.6.3 (storytold/cadcraft, ...)` | l'app installata e' indietro rispetto alla pubblicata |
-| `0.6.2 > 0.6.3` | il ponte e' avanti: build di prova, o feed vecchio |
-| `installata non leggibile` | il feed risponde, l'eseguibile no: si avvia l'app una volta |
-| `download <file>: byte diversi da quelli pubblicati` | il file scaricato non corrisponde al suo sha256 |
-| `byte <slug>: <cli> e' <membro> dentro <archivio>, byte per byte` | l'eseguibile installato **e'** quello pubblicato |
-| `byte <slug>: <a> != <b> dentro <archivio>` | l'eseguibile installato non e' quello pubblicato |
-| `feed coerente` | `feed.json` e `releases.json` non concordano sulla stessa app |
+| `0.8.2 = 0.8.2 (storytold/photocraft, installata da eseguibile di config)` | aligned, and the source of the installed version is declared |
+| `0.6.2 < 0.6.3 (storytold/cadcraft, ...)` | the installed app is behind the published one |
+| `0.6.2 > 0.6.3` | the bridge is ahead: a test build, or an old feed |
+| `installata non leggibile` | the feed answers, the executable does not: start the app once |
+| `download <file>: byte diversi da quelli pubblicati` | the downloaded file does not match its sha256 |
+| `byte <slug>: <cli> e' <membro> dentro <archivio>, byte per byte` | the installed executable **is** the published one |
+| `byte <slug>: <a> != <b> dentro <archivio>` | the installed executable is not the published one |
+| `feed coerente` | `feed.json` and `releases.json` disagree about the same app |
 
-# Esiti
+# Exit codes
 
-| Uscita | Significato |
+| Exit | Meaning |
 |---|---|
-| 0 | nessuno scostamento |
-| 1 | almeno uno scostamento: un'app indietro o avanti, un archivio scaricato che non corrisponde al suo sha256, oppure la CLI installata che non e' quella dentro il pacchetto |
-| 2 | errore d'uso (per esempio `--download` su un'app fuori dalla tabella) |
-| 3 | feed assente o illeggibile, o scaricamento fallito |
+| 0 | no divergence |
+| 1 | at least one divergence: an app behind or ahead, a downloaded archive that does not match its sha256, or an installed CLI that is not the one inside the package |
+| 2 | usage error (for instance `--download` on an app outside the table) |
+| 3 | feed missing or unreadable, or a failed download |
 
-# Costo
+# Cost
 
-~0,9 s senza archivi da leggere, quasi tutto nella lettura delle versioni degli
-eseguibili (un solo giro di PowerShell). `doctor --no-live`, che include questo
-confronto, resta sotto il secondo: la lettura delle versioni era gia' necessaria e non
-viene ripetuta. Con `--bytes` si aggiunge la lettura di ogni archivio presente (uno
-`sha256` da 14-120 MB) e l'apertura per il singolo membro: misurato su un archivio da
-14,3 MB, pochi decimi di secondo. Con `--download` si aggiunge lo scaricamento: 14,3 MB
-in 2 s sulla rete di questa macchina.
+~0.9 s with no archives to read, almost all of it in reading the executable versions (a
+single PowerShell round). `doctor --no-live`, which includes this comparison, stays under
+a second: reading the versions was needed anyway and is not repeated. With `--bytes` the
+reading of every archive present is added (one `sha256` over 14-120 MB) plus opening it for
+the single member: measured on a 14.3 MB archive, a few tenths of a second. With
+`--download` the download is added: 14.3 MB in 2 s on this machine's network.
 
-# Misura del 13 ottobre 2026
+# Measurement of 13 October 2026
 
-* 11 app su 11 allineate alla release pubblicata, con la versione letta dall'eseguibile
-  (GridCraft dall'impronta registrata).
-* **Byte per byte**: SoundCraft 0.6.1 — `soundcraft-cli.exe` installato e quello dentro
-  `soundcraft-0.6.1-windows-x64-portable.zip` hanno lo stesso `sha256`
-  (`915ee3abb121b7b9...`), e l'archivio scaricato corrisponde alla sua impronta
-  pubblicata (`cd5f8d98257f7711...`). Le altre 10 app non hanno l'archivio sul disco:
-  sono `nota` con il comando per prenderlo, non un confronto mancato.
-* **Prova negativa**: un byte in piu' nell'archivio in cache → `FIX byte soundcraft:
-  non e' quello pubblicato: a4228f8080b2... != cd5f8d98257f...`, uscita 1.
-* 2 voci del feed fuori dal ponte: `pdfcraft` 0.7.1 (MCP senza ponte) e
-  `artcraft-launcher` 0.3.2 (e' il launcher, non una app da guidare).
-* Cartella dei download vuota: niente byte da confrontare, e questo **non** e' un
-  successo, e' una lacuna dichiarata.
+* 12 of 12 apps aligned with the published release, with the version read from the
+  executable (GridCraft from the recorded fingerprint).
+* **Byte for byte**: SoundCraft 0.6.1 — the installed `soundcraft-cli.exe` and the one
+  inside `soundcraft-0.6.1-windows-x64-portable.zip` have the same `sha256`
+  (`915ee3abb121b7b9...`), and the downloaded archive matches its published digest
+  (`cd5f8d98257f7711...`). The other 10 apps have no archive on disk: they are a `nota`
+  with the command to fetch it, not a missed comparison.
+* **Negative test**: one extra byte in the cached archive → `FIX byte soundcraft: non e'
+  quello pubblicato: a4228f8080b2... != cd5f8d98257f...`, exit 1.
+* 12 of 12 apps aligned: `pdfcraft` 0.7.1 too, since the bridge serves it with the
+  [translator](craft-bridge-ui.md) — the translator's apps are not in the shim table, so
+  the table compared with the feed is the one of the apps **served by the bridge**
+  (`CONFIG.bridge_table()`).
+* 1 feed entry outside the bridge: `artcraft-launcher` 0.3.2 (it is the launcher, not an
+  app to drive).
+* Downloads folder empty: no bytes to compare, and this is **not** a success, it is a
+  declared gap.
 
-# Cosa non fa
+# What it does not do
 
-* Non scarica niente da solo: solo con `--download <slug>`, un'app alla volta, dagli
-  host del feed (GitHub) e in `https`. Lo `sha256` pubblicato si verifica prima di usare
-  il file, che resta `.parte` finche' non torna.
-* Non si applica a ogni contenitore: un MSI, un .dmg, un .deb, un .rpm o un AppImage
-  non si aprono con la libreria standard, quindi per quelle app i byte restano non
-  confrontati e la riga lo dichiara. Su Windows questo significa che la risposta arriva
-  dal pacchetto **portabile**, che e' pubblicato sempre.
-* Non decide se un aggiornamento va fatto adesso: dice che c'e'. Dentro
-  [craft-bridge-doctor](craft-bridge-doctor.md) un'app indietro e' una `nota`, non un
-  `FIX`, perche' il ponte funziona anche con la versione precedente.
-* Gli altri percorsi del feed (macOS, Linux) sono quelli **attesi** dalle rispettive
-  piattaforme, non misurati su questa macchina: altrove si usa `--feed-dir`.
+* It downloads nothing on its own: only with `--download <slug>`, one app at a time, from
+  the feed hosts (GitHub) and over `https`. The published `sha256` is verified **before**
+  the file is used, and it stays `.parte` until it matches.
+* It does not apply to every container: an MSI, a .dmg, a .deb, an .rpm or an AppImage
+  cannot be opened with the standard library, so for those apps the bytes stay
+  uncompared and the line says so. On Windows this means the answer comes from the
+  **portable** package, which is always published.
+* It does not decide whether an update should happen now: it says one is available. Inside
+  [craft-bridge-doctor](craft-bridge-doctor.md) an app behind is a `nota`, not a `FIX`,
+  because the bridge works with the previous version too.
+* The other feed paths (macOS, Linux) are the ones **expected** by those platforms, not
+  measured on this machine: elsewhere use `--feed-dir`.
 
-# Relazioni
+# Relations
 
-- **usa** [craft-bridge-ident](craft-bridge-ident.md) per la build installata
-- **usato da** [craft-bridge-doctor](craft-bridge-doctor.md) - la riga `pubblicato` del verdetto
-- **provato da** [craft-bridge-tests](craft-bridge-tests.md) - tre casi: confronto con feed finto, byte contro archivi finti, esiti 3 sugli errori del feed
-- **scarica secondo** [Regole di sicurezza](../operations/safety-rules.md) - host, impronta, cache
-- **stessa tabella delle app** [craft-bridge-mcp](craft-bridge-mcp.md) - nessuna seconda tabella
+- **uses** [craft-bridge-ident](craft-bridge-ident.md) for the installed build
+- **used by** [craft-bridge-doctor](craft-bridge-doctor.md) - the `pubblicato` line of the verdict
+- **proved by** [craft-bridge-tests](craft-bridge-tests.md) - three cases: comparison with a fake feed, bytes against fake archives, exit 3 on feed errors
+- **it downloads according to** [Safety rules](../operations/safety-rules.md) - hosts, digest, cache
+- **same app table as** [craft-bridge-mcp](craft-bridge-mcp.md) - no second table

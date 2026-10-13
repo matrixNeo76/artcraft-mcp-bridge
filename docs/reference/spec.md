@@ -1,67 +1,71 @@
 ---
 type: Reference
-title: "Spec del progetto"
-description: "Requisiti, vincoli e criteri di accettazione del ponte tra le Crafting Apps e i client MCP."
+title: "Project spec"
+description: "Requirements, constraints and acceptance criteria of the bridge between the Crafting Apps and MCP clients."
 resource: ../../docs/reference/spec.md
-tags: [spec, requisiti]
+tags: [spec, requirements]
 generated: { by: process:freebuff-buffy, at: 2026-10-13T14:23:21Z }
 status: stable
 ---
 
-# ArtCraft MCP — Specifica di integrazione globale
+# ArtCraft MCP — global integration specification
 
-**Riferimento:** [analisi.md](./analisi.md) · **Piano:** [piano.md](./piano.md)
-**Data:** 13 ottobre 2026 · **Stato:** proposta, in attesa di conferma
-
----
-
-## 1. Obiettivo
-
-Rendere il server **`artcraft-mcp` (61 tool)** disponibile in modo **stabile, idempotente e sicuro** a tutti i client MCP presenti sulla macchina, con **una sola definizione di verità** (path binario + credenziali) replicata nei singoli file di config.
-
-Ambito A: **MCP della piattaforma generativa ArtCraft**. Ambito B: i **12 MCP delle Crafting Apps** (§8), che sono un ecosistema distinto con 12 server propri. Entrambi sono stati **implementati**.
+**Reference:** [analysis.md](./analysis.md) · **Plan:** [plan.md](./plan.md)
+**Date:** 13 October 2026 · **State:** proposal, pending confirmation
 
 ---
 
-## 2. Requisiti
+## 1. Goal
 
-### 2.1 Funzionali
+To make the **`artcraft-mcp` server (61 tools)** available in a **stable, idempotent and safe**
+way to all the MCP clients present on the machine, with **a single definition of truth** (binary
+path + credentials) replicated in the individual config files.
 
-| ID | Requisito |
+Scope A: **MCP of the ArtCraft generative platform**. Scope B: the **12 MCP servers of the
+Crafting Apps** (§8), which are a distinct ecosystem with 12 servers of their own. Both have been
+**implemented**.
+
+---
+
+## 2. Requirements
+
+### 2.1 Functional
+
+| ID | Requirement |
 |---|---|
-| FR1 | Il binario risiede in un **path stabile per-utente**, non in `Downloads` |
-| FR2 | Le **credenziali** sono risolte da un'unica fonte esterna al pacchetto |
-| FR3 | La entry `artcraft` è registrata, **idempotentemente**, in ogni client rilevato |
-| FR4 | Ogni scrittura di config crea un **backup** preservabile e ripristinabile |
-| FR5 | Lo script è **ri-eseguibile** senza duplicare o corrompere le entry esistenti |
-| FR6 | Viene prodotta una **skill globale** `artcraft-mcp` per i client che supportano le skill |
-| FR7 | È presente una **verifica end-to-end** (handshake + `tools/list` + una chiamata account) |
-| FR8 | Codex è gestito in modalità **"documentato, non applicato"** finché non installato |
+| FR1 | The binary lives in a **stable per-user path**, not in `Downloads` |
+| FR2 | The **credentials** are resolved from a single source outside the package |
+| FR3 | The `artcraft` entry is registered, **idempotently**, in every detected client |
+| FR4 | Every config write creates a **backup** that can be preserved and restored |
+| FR5 | The script is **re-runnable** without duplicating or corrupting existing entries |
+| FR6 | A **global `artcraft-mcp` skill** is produced for the clients that support skills |
+| FR7 | An **end-to-end verification** is present (handshake + `tools/list` + one account call) |
+| FR8 | Codex is handled in **"documented, not applied"** mode until it is installed |
 
-### 2.2 Non funzionali
+### 2.2 Non-functional
 
-| ID | Requisito |
+| ID | Requirement |
 |---|---|
-| NFR1 | **Nessun privilegio amministrativo** (installazione per-utente) |
-| NFR2 | **Nessun segreto** nei file tracciati da git né negli output/log |
-| NFR3 | **Nessuna** modifica distruttiva: mai cancellare server MCP preesistenti |
-| NFR4 | Script **fail-safe**: in caso di errore non lascia config parziali |
-| NFR5 | Determinismo dei path: nessuna dipendenza da `HOME`/`USERPROFILE` a mano |
-| NFR6 | Tracciabilità: log di cosa è stato scritto e dove |
+| NFR1 | **No administrative privileges** (per-user installation) |
+| NFR2 | **No secret** in files tracked by git nor in outputs/logs |
+| NFR3 | **No** destructive change: never delete pre-existing MCP servers |
+| NFR4 | **Fail-safe** script: on error it leaves no partial config |
+| NFR5 | Determinism of paths: no dependency on `HOME`/`USERPROFILE` by hand |
+| NFR6 | Traceability: log of what was written and where |
 
 ---
 
-## 3. Architettura target
+## 3. Target architecture
 
 ```
                  ┌───────────────────────────────────────────┐
-                 │  SORGENTE UNICA DI VERITÀ                  │
+                 │  SINGLE SOURCE OF TRUTH                    │
                  │  · BIN : %LOCALAPPDATA%\Programs\           │
                  │          artcraft-mcp\artcraft-mcp.exe      │
                  │  · CRED: ~\Artcraft\credentials\*.txt       │
-                 │          oppure env ARTCRAFT_*              │
+                 │          or env ARTCRAFT_*                  │
                  └───────────────────┬───────────────────────┘
-                                     │  installer idempotente
+                                     │  idempotent installer
         ┌───────────────┬────────────┼────────────┬────────────────┐
         ▼               ▼            ▼            ▼                ▼
    Freebuff        Claude Code   Claude Desktop   dsh          Antigravity
@@ -70,24 +74,24 @@ Ambito A: **MCP della piattaforma generativa ArtCraft**. Ambito B: i **12 MCP de
                                   config.json
         └───────────────┴────────────┴────────────┴────────────────┘
                                      │
-                              Codex: solo doc
+                              Codex: docs only
                          (~\.codex\config.toml)
 ```
 
-### 3.1 Livelli di scope
+### 3.1 Scope levels
 
-| Scope | Dove | Uso consigliato |
+| Scope | Where | Recommended use |
 |---|---|---|
-| **Globale/utente** | i file di §5 | default: disponibile in ogni progetto |
-| **Progetto** | `<progetto>\.agents\mcp.json`, `<progetto>\.mcp.json` | override per singolo repo |
+| **Global/user** | the files of §5 | default: available in every project |
+| **Project** | `<project>\.agents\mcp.json`, `<project>\.mcp.json` | override per repo |
 
-Scelta consigliata: **globale/utente**, per soddisfare la richiesta "usarlo con tutti i framework".
+Recommended choice: **global/user**, to satisfy the request "use it with all the frameworks".
 
 ---
 
-## 4. Contratti
+## 4. Contracts
 
-### 4.1 Entry canonica (forma generica `mcpServers`)
+### 4.1 Canonical entry (generic `mcpServers` shape)
 
 ```json
 {
@@ -102,22 +106,24 @@ Scelta consigliata: **globale/utente**, per soddisfare la richiesta "usarlo con 
 }
 ```
 
-Note di compatibilità:
-- **Freebuff** legge `~\.agents\mcp.json` e supporta `type: "stdio"` + `command`/`args`/`env`.
-- **Claude Code / Claude Desktop / Antigravity** usano `command`/`args`/`env` nella medesima forma.
-- Chiavi extra come `description`/`enabled` (generate da `setup_mcp.py`) sono **innocue** ma non necessarie.
+Compatibility notes:
+- **Freebuff** reads `~\.agents\mcp.json` and supports `type: "stdio"` + `command`/`args`/`env`.
+- **Claude Code / Claude Desktop / Antigravity** use `command`/`args`/`env` in the same shape.
+- Extra keys such as `description`/`enabled` (generated by `setup_mcp.py`) are **harmless** but
+  unnecessary.
 
-### 4.2 Credenziali — ordine di risoluzione del server
+### 4.2 Credentials — the server's order of resolution
 
 1. `ARTCRAFT_MCP_PRIVATE_SESSION_TOKEN`
 2. `ARTCRAFT_API_KEY`
 3. `ARTCRAFT_SESSION` + `ARTCRAFT_AVT`
 4. `~\Artcraft\credentials\artcraft_session.txt` + `artcraft_avt.txt`
-5. cookie store dell'app desktop `%LOCALAPPDATA%\ai.artcraft.app\.cookies`
+5. cookie store of the desktop app `%LOCALAPPDATA%\ai.artcraft.app\.cookies`
 
-**Scelta consigliata:** metodo **4** (file di credenziali) — disaccoppia l'MCP dal client e non mette segreti nei JSON di config.
+**Recommended choice:** method **4** (credentials file) — it decouples the MCP server from the
+client and puts no secrets in the config JSONs.
 
-### 4.3 Config Codex (solo documentazione)
+### 4.3 Codex config (documentation only)
 
 ```toml
 # %USERPROFILE%\.codex\config.toml
@@ -128,60 +134,66 @@ args = []
 
 ### 4.4 dsh (DeepSeek Harness)
 
-dsh non usa un `mcp.json` ma **patch `cordis.patch.yml`** (livello home `%APPDATA%\dsh-desktop\harness\cordis.patch.yml` e livello profilo) con l'id plugin `dsh-mcp-client` e `config.serverName/command/args/env`.
+dsh does not use an `mcp.json` but **`cordis.patch.yml` patches** (home level
+`%APPDATA%\dsh-desktop\harness\cordis.patch.yml` and profile level) with the plugin id
+`dsh-mcp-client` and `config.serverName/command/args/env`.
 
-Strategia consigliata: **non editare a mano**; aggiungere il server dalla **UI di dsh** e, se serve portabilità, usare il plugin `dsh-config-manager` (import/backup).
+Recommended strategy: **do not edit by hand**; add the server from the **dsh UI** and, if
+portability is needed, use the `dsh-config-manager` plugin (import/backup).
 
 ---
 
-## 5. Mappa client → azione
+## 5. Client → action map
 
-| Client | File | Azione | Note |
+| Client | File | Action | Notes |
 |---|---|---|---|
-| Freebuff | `~\.agents\mcp.json` | crea/merge chiave `artcraft` | attualmente assente → creare da zero |
-| Claude Code | `~\.claude.json` → `mcpServers` | merge preservando `blender/drawio/railway` | preferibile `claude mcp add -s user artcraft -- <bin>` |
-| Claude Desktop | `%APPDATA%\Claude\claude_desktop_config.json` | merge in `mcpServers` (vuoto) | — |
-| Antigravity | `~\.gemini\config\mcp_config.json` | merge preservando `notebooklm` | opzionale |
-| dsh | `cordis.patch.yml` via UI | aggiunta da UI | non automatizzare |
-| Codex | `~\.codex\config.toml` | **solo doc** | non installato |
+| Freebuff | `~\.agents\mcp.json` | create/merge the `artcraft` key | currently absent → create from scratch |
+| Claude Code | `~\.claude.json` → `mcpServers` | merge preserving `blender/drawio/railway` | preferable `claude mcp add -s user artcraft -- <bin>` |
+| Claude Desktop | `%APPDATA%\Claude\claude_desktop_config.json` | merge into `mcpServers` (empty) | — |
+| Antigravity | `~\.gemini\config\mcp_config.json` | merge preserving `notebooklm` | optional |
+| dsh | `cordis.patch.yml` via UI | added from the UI | do not automate |
+| Codex | `~\.codex\config.toml` | **docs only** | not installed |
 
 ---
 
-## 6. Strategia skill
+## 6. Skill strategy
 
-**Decisione di progetto: UNA sola skill globale** per l'ambito A.
+**Design decision: ONE global skill** for scope A.
 
-- Fonte: `skills/artcraft-mcp/` del pacchetto (`SKILL.md` + `references/`).
-- Destinazioni:
+- Source: `skills/artcraft-mcp/` of the package (`SKILL.md` + `references/`).
+- Destinations:
   - Freebuff: `~\.agents\skills\artcraft-mcp\`
   - Claude Code: `~\.claude\skills\artcraft-mcp\`
-  - (altri client con supporto skill: stessa struttura `<root>\skills\artcraft-mcp\SKILL.md`)
-- ⚠️ `~\.agents\skills` è un **symlink** a `~\repos\craft-skills-flow\skills`: va deciso se scrivere là dentro (versionato) o usare una cartella reale.
-- La skill è **opzionale ma raccomandata**: abilita le buone pratiche di scelta modello, aspect ratio e **stima costi obbligatoria** prima di ogni generazione.
-- **Non** creare una skill per ogni Crafting App se le app non sono installate.
+  - (other clients with skill support: same structure `<root>\skills\artcraft-mcp\SKILL.md`)
+- ⚠️ `~\.agents\skills` is a **symlink** to `~\repos\craft-skills-flow\skills`: it must be decided
+  whether to write there (versioned) or to use a real folder.
+- The skill is **optional but recommended**: it enables the good practices for model choice,
+  aspect ratio and the **mandatory cost estimate** before every generation.
+- Do **not** create a skill per Crafting App if the apps are not installed.
 
 ---
 
-## 7. Criteri di accettazione
+## 7. Acceptance criteria
 
-| ID | Criterio | Verifica |
+| ID | Criterion | Verification |
 |---|---|---|
-| AC1 | `artcraft-mcp.exe` esiste nel path stabile | `Test-Path` |
-| AC2 | Handshake MCP riuscito | `initialize` → `protocol_version: 2025-03-26` |
-| AC3 | 61 tool esposti | `tools/list` → count = 61 |
-| AC4 | Auth funzionante | `artcraft_get_credits` restituisce un saldo |
-| AC5 | Entry presente in ogni client rilevato | rilettura dei JSON |
-| AC6 | Config preesistenti intatte | `blender/drawio/railway`, `notebooklm` ancora presenti |
-| AC7 | Backup creati | file `.bak.<timestamp>` accanto ai config |
-| AC8 | Re-run idempotente | seconda esecuzione → nessuna differenza |
-| AC9 | Skill leggibile dai client | il client elenca `artcraft-mcp` tra le skill |
-| AC10 | Nessun segreto in git | `git status` / grep sui file scritti |
+| AC1 | `artcraft-mcp.exe` exists in the stable path | `Test-Path` |
+| AC2 | MCP handshake successful | `initialize` → `protocol_version: 2025-03-26` |
+| AC3 | 61 tools exposed | `tools/list` → count = 61 |
+| AC4 | Auth working | `artcraft_get_credits` returns a balance |
+| AC5 | Entry present in every detected client | re-reading the JSONs |
+| AC6 | Pre-existing configs intact | `blender/drawio/railway`, `notebooklm` still present |
+| AC7 | Backups created | `.bak.<timestamp>` files beside the configs |
+| AC8 | Idempotent re-run | second run → no difference |
+| AC9 | Skill readable by the clients | the client lists `artcraft-mcp` among the skills |
+| AC10 | No secrets in git | `git status` / grep on the files written |
 
 ---
 
-## 8. Ambito B (implementato) — Crafting Apps
+## 8. Scope B (implemented) — Crafting Apps
 
-Le 12 Crafting Apps sono installate in `C:\Program Files\<App>\`, ognuna con `<app>-cli.exe` che espone il sottocomando `mcp`. La spec per l'ambito B è quindi:
+The 12 Crafting Apps are installed in `C:\Program Files\<App>\`, each with `<app>-cli.exe`
+exposing the `mcp` subcommand. The spec for scope B is therefore:
 
 ```json
 {
@@ -195,41 +207,49 @@ Le 12 Crafting Apps sono installate in `C:\Program Files\<App>\`, ognuna con `<a
 }
 ```
 
-Regole applicate:
-- **una entry per app**, con `args: ["mcp"]` e **path assoluto** (le CLI non sono nel PATH);
-- naming: `cadcraft`, `deckcraft`, `designcraft`, `effectcraft`, `filmcraft`, `gridcraft`, `lightcraft`, `pdfcraft`, `photocraft`, `soundcraft`, `vectorcraft`, `wordcraft`;
-- scoperta automatica: la entry viene creata **solo se** `<App>\<app>-cli.exe` esiste;
-- nessuna credenziale richiesta (motore locale).
+Rules applied:
+- **one entry per app**, with `args: ["mcp"]` and an **absolute path** (the CLIs are not on the PATH);
+- naming: `cadcraft`, `deckcraft`, `designcraft`, `effectcraft`, `filmcraft`, `gridcraft`,
+  `lightcraft`, `pdfcraft`, `photocraft`, `soundcraft`, `vectorcraft`, `wordcraft`;
+- automatic discovery: the entry is created **only if** `<App>\<app>-cli.exe` exists;
+- no credential required (local engine).
 
-Opzioni avanzate non attivate (da valutare per uso reale):
-- **sandbox filesystem**: `--automation-read-root` / `--automation-write-root` restringono i file accessibili dall'agente;
-- **bridged mode**: `mcp --bridge 127.0.0.1:<porta>` verso l'app desktop avviata con `<app> --control <porta>`, con `--control-token` per l'autorizzazione;
-- **skill per app**: da creare solo per le app effettivamente usate.
+Advanced options not activated (to be assessed for real use):
+- **filesystem sandbox**: `--automation-read-root` / `--automation-write-root` restrict the files
+  the agent can reach;
+- **bridged mode**: `mcp --bridge 127.0.0.1:<port>` towards the desktop app started with
+  `<app> --control <port>`, with `--control-token` for authorisation;
+- **skill per app**: to be created only for the apps actually used.
 
-### 8.1 Impatto sul contesto
+### 8.1 Impact on the context
 
-12 server MCP sommati all'MCP generativo aumentano sensibilmente il numero di tool esposti a **ogni** client. Per questo l'installer espone le opzioni `-SkipSuite` e `-SkipGenerative`, e le entry possono essere rimosse selettivamente.
+12 MCP servers added to the generative MCP noticeably increase the number of tools exposed to
+**every** client. That is why the installer offers the `-SkipSuite` and `-SkipGenerative` options,
+and the entries can be removed selectively.
 
 ---
 
-### 8.2 Shim di conformità MCP (Ambito A)
+### 8.2 MCP conformance shim (Scope A)
 
-L'MCP generativo `artcraft-mcp.exe` non è conforme alla specifica (campi snake_case). Requisiti dello shim:
+The generative MCP `artcraft-mcp.exe` is not conformant with the specification (snake_case fields).
+Requirements of the shim:
 
-| ID | Requisito | Stato |
+| ID | Requirement | State |
 |---|---|---|
-| SH1 | Trasparente: il client parla MCP standard, il server resta invariato | ✅ |
-| SH2 | Riscrivere **solo** i campi di protocollo noti, mai gli schemi dei tool | ✅ |
-| SH3 | Idempotente (se il campo è già camelCase non tocca nulla) | ✅ |
-| SH4 | I/O UTF-8 **binario**, nessuna traduzione di newline (framing line-delimited) | ✅ |
-| SH5 | Messaggi non-JSON inoltrati verbatim, mai scartati | ✅ |
-| SH6 | Nessun deadlock: pump stdout e stderr su thread separati | ✅ |
-| SH7 | Propagare la chiusura di stdin e il codice di uscita del figlio | ✅ |
-| SH8 | Percorso del binario sovrascrivibile via `ARTCRAFT_MCP_BIN` | ✅ |
+| SH1 | Transparent: the client speaks standard MCP, the server stays unchanged | ✅ |
+| SH2 | Rewrite **only** the known protocol fields, never the tool schemas | ✅ |
+| SH3 | Idempotent (if the field is already camelCase it touches nothing) | ✅ |
+| SH4 | **Binary** UTF-8 I/O, no newline translation (line-delimited framing) | ✅ |
+| SH5 | Non-JSON messages forwarded verbatim, never discarded | ✅ |
+| SH6 | No deadlock: pump stdout and stderr on separate threads | ✅ |
+| SH7 | Propagate stdin closure and the child's exit code | ✅ |
+| SH8 | Binary path overridable via `ARTCRAFT_MCP_BIN` | ✅ |
 
-Campi riscritti: `protocol_version`→`protocolVersion`, `server_info`→`serverInfo`, `list_changed`→`listChanged`, `input_schema`→`inputSchema`, `output_schema`→`outputSchema`, `is_error`→`isError`.
+Fields rewritten: `protocol_version`→`protocolVersion`, `server_info`→`serverInfo`,
+`list_changed`→`listChanged`, `input_schema`→`inputSchema`, `output_schema`→`outputSchema`,
+`is_error`→`isError`.
 
-Registrazione risultante:
+Resulting registration:
 
 ```json
 "artcraft": {
@@ -241,8 +261,8 @@ Registrazione risultante:
 
 ---
 
-## 9. Fuori scope
+## 9. Out of scope
 
-- Modifica/compilazione del sorgente Rust dell'MCP.
-- Pubblicazione di pacchetti o upload su registry.
-- Acquisti/crediti (i tool di billing restano esposti ma non automatizzati).
+- Modifying/compiling the Rust source of the MCP server.
+- Publishing packages or uploading to a registry.
+- Purchases/credits (the billing tools stay exposed but are not automated).

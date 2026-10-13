@@ -1,59 +1,97 @@
 ---
 type: Tool
-title: "craft-bridge-launch - avvia le app col canale attivo"
-description: "Avvia una o piu' app staccate dalla shell, con --control sulla porta che la config si aspetta, aspetta i canali in parallelo e dice chi risponde (e con quale build)."
+title: "craft-bridge-launch - starts the apps with the channel active"
+description: "Starts one or more apps detached from the shell, with --control on the port (or on the file, for PdfCraft) the config expects, waits for the channels in parallel and says who answers (and with which build). The executable to start is the one the system registers, not a path written by hand."
 resource: ../../tools/craft-bridge-launch.py
-tags: [strumento, avvio, launcher]
+tags: [tool, startup, launcher]
 generated: { by: process:freebuff-buffy, at: 2026-10-13T14:26:01Z }
 status: stable
 sources:
 - resource: ../../tools/craft-bridge-launch.py
-  title: sorgente
+  title: source
 - resource: ../../docs/reference/craft-bridge.md
-  title: Manuale tecnico completo
+  title: complete technical manual
 - resource: ../../tools/craft-bridge-tests.py
-  title: La suite che prova gli strumenti
+  title: the suite that exercises the tools
 ---
 
-# Cosa fa
+# What it does
 
-Salta le app il cui canale e' gia' su, avvia le altre **staccate dalla shell**
-(le finestre restano aperte dopo il ritorno del comando) con `--control <porta>` e
-`--control-token-file` dove serve, aspetta tutti i canali in parallelo, e chiede al
-peer chi e' per ognuno.
+It skips the apps whose channel is already up, starts the others **detached from the
+shell** (the windows stay open after the command returns) with `--control <port>` and
+`--control-token-file` where needed, waits for all the channels in parallel, and asks the
+peer who it is for each of them.
 
-# Interfaccia
+# Interface
 
 ```
-python tools/craft-bridge-launch.py                     # tutte le app della config
+python tools/craft-bridge-launch.py                     # every app in the config
 python tools/craft-bridge-launch.py --apps gridcraft,photocraft
-python tools/craft-bridge-launch.py --list              # tabella e stato, non avvia
-python tools/craft-bridge-launch.py --dry-run           # mostra i comandi, non avvia
+python tools/craft-bridge-launch.py --list              # table and state, starts nothing
+python tools/craft-bridge-launch.py --dry-run           # shows the commands, starts nothing
 python tools/craft-bridge-launch.py --apps gridcraft --verify
 ```
 
-| Opzione | Significato |
+| Option | Meaning |
 |---|---|
-| `--apps` | slug separati da virgola (default: tutte le app in config) |
-| `--port slug=porta` | porta diversa da quella attesa (ripetibile) |
-| `--wait` | secondi di attesa per canale (default 45) |
-| `--list` / `--dry-run` | non avvia niente |
-| `--verify` | chiede anche allo shim in quale modo partirebbe |
-| `--record-builds` | registra le impronte delle build incontrate |
-| `--json` | report JSON |
+| `--apps` | comma-separated slugs (default: every app in the config) |
+| `--port slug=port` | a port other than the expected one (repeatable; an app served by the translator has none) |
+| `--wait` | seconds to wait per channel (default 45) |
+| `--list` / `--dry-run` | start nothing |
+| `--verify` | also asks the shim in which mode it would start |
+| `--record-builds` | records the fingerprints of the builds encountered |
+| `--json` | JSON report |
 
-# Esiti
+# Where the path comes from
 
-| Uscita | Significato |
+The port comes from the config (the one the shim will probe), the **executable from the
+system registration**: for every app it starts what the installer wrote in `App Paths`,
+the same entry Windows uses to open it by name. The internal table stays as a
+confirmation - and as a fallback where the registry has nothing. `--list` shows the
+`percorso` column, so a divergence is visible at a glance instead of ageing away; the full
+rule is in [Where the app is](../architecture/app-locations.md).
+
+The ArtCraft launcher is **not** used to start apps, and not by choice: it offers no
+command-line way to do it (no `--install`/`--launch`, no registered URL scheme; upstream
+issues #128 and #148 ask for exactly this). The launcher knows which releases exist, not
+where they are installed.
+
+# PdfCraft: a different transport, the same question
+
+PdfCraft starts from here too, but its `--control` wants a **file**, not a port: the port
+is chosen by the app, which writes it inside the file. So "can it be driven right now?" is
+not answered by a fixed port - it is answered by the
+[translator](craft-bridge-ui.md), which authenticates with the file's token and says
+`bridged` or `headless`. `--list` shows it in a section of its own (columns: slug, port,
+transport, mode, app open, why), and `--verify` carries the same idea all the way:
+
+```
+python tools/craft-bridge-launch.py --apps pdfcraft --verify
+  avvio      : C:\Program Files\PdfCraft\pdfcraft.exe --control C:\Users\...\pdfcraft-control.json
+  stato      : bridged (la finestra risponde e autentica)
+  canale     : attivo (traduttore: bridged, porta 48129)
+  finestra   : 1440.0x920.0 punti (pid 42336)
+  catalogo   : 15 metodi , gli stessi che dichiara l'app
+```
+
+The apps served by the translator are recognised from the **entry itself** (the one that
+names `craft-bridge-ui.py`), not from a list written by hand: that way there is no second
+copy of the same information to keep aligned.
+
+# Exit codes
+
+| Exit | Meaning |
 |---|---|
-| 0 | ogni app richiesta ha il canale attivo **e la build configurata** |
-| 1 | almeno una no: la riga `diagnosi` dice perche', con la coda del log |
-| 2 | errore d'uso (slug sconosciuto, porta duplicata) |
-| 3 | config o tabella delle app illeggibili |
+| 0 | every requested app has the channel active **and the configured build** |
+| 1 | at least one does not: the `diagnosi` line says why, with the tail of the log |
+| 2 | usage error (unknown slug, duplicate port) |
+| 3 | unreadable config or app table |
 
-# Relazioni
+# Relations
 
-- **verifica con** [craft-bridge-ident](craft-bridge-ident.md)
-- **config attesa da** [craft-bridge-config](craft-bridge-config.md)
-- **provato su tutte le app in** [Manuale tecnico](../reference/craft-bridge.md)
-- **nel runbook** [Installare e riparare](../operations/install-and-repair.md)
+- **the paths are resolved by** [Where the app is](../architecture/app-locations.md)
+- **it starts, for PdfCraft, the app served by** [craft-bridge-ui](craft-bridge-ui.md)
+- **it verifies with** [craft-bridge-ident](craft-bridge-ident.md)
+- **the config it expects from** [craft-bridge-config](craft-bridge-config.md)
+- **proved on every app in** [Technical manual](../reference/craft-bridge.md)
+- **in the runbook** [Install and repair](../operations/install-and-repair.md)

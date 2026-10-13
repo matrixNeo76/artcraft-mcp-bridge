@@ -1,45 +1,44 @@
 ---
 type: Finding
-title: "Il bridged ripiegava in silenzio su un peer muto"
-description: "Con un socket che accetta e tace, lo shim dichiarava bridged e la CLI rispondeva 25 tool senza errore: un headless travestito, indistinguibile dalla lista dei tool."
+title: "Bridged fell back in silence onto a mute peer"
+description: "With a socket that accepts and stays mute, the shim declared bridged and the CLI answered 25 tools with no error: a headless in disguise, indistinguishable from the tool list."
 resource: ../../tools/craft-bridge-mcp.py
-tags: [difetto, shim, handshake]
+tags: [defect, shim, handshake]
 generated: { by: process:freebuff-buffy, at: 2026-10-13T14:26:01Z }
 status: stable
 sources:
 - resource: ../../tools/craft-bridge-mcp.py
-  title: il codice corretto
+  title: the fixed code
 - resource: ../../docs/architecture/shim-modes.md
-  title: la decisione attuale
+  title: the current decision
 - resource: ../../docs/reference/craft-bridge.md
-  title: Manuale tecnico completo
+  title: complete technical manual
 ---
 
-# Sintomo
+# Symptom
 
-Al posto dell'app, un socket che **accetta la connessione e poi tace**. Lo shim
-dichiarava `modalita' bridged`, e la CLI dell'app rispondeva `25 tool, nessun
-errore`. Nessuno se ne accorgeva guardando la lista dei tool.
+In place of the app, a socket that **accepts the connection and then stays mute**. The shim
+declared `modalita' bridged`, and the app's CLI answered `25 tool, nessun errore`. Nobody
+noticed by looking at the tool list.
 
-# Causa
+# Cause
 
-La scelta del modo non era verificata: bastava che la porta fosse aperta. Un peer
-muto era trattato come peer vivo.
+The mode was not verified: it was enough for the port to be open. A mute peer was treated
+as a live peer.
 
-# Correzione
+# Fix
 
-La decisione si prende con l'**handshake**: `peer=silent` o `peer=foreign` portano in
-**headless**, e lo shim lo scrive su stderr. Il launcher esce 1, `ident` da' il
-verdetto. `--require-bridge` trasforma il ripiego in uscita 3, per chi vuole la
-certezza.
+The decision is taken with the **handshake**: `peer=silent` or `peer=foreign` lead to
+**headless**, and the shim writes it on stderr. The launcher exits 1, `ident` gives the
+verdict. `--require-bridge` turns the fallback into exit 3, for whoever wants certainty.
 
-# Come e' coperto oggi
+# How it is covered today
 
-Caso *porta chiusa* e casi con peer muto/estraneo nella
-[suite dei guasti](../tools/craft-bridge-tests.md).
+The *closed port* case and the cases with a mute/foreign peer in the
+[fault suite](../tools/craft-bridge-tests.md).
 
-# Relazioni
+# Relations
 
-- **regola attuale in** [Modi dello shim](../architecture/shim-modes.md)
-- **misurato con** [craft-bridge-ident](../tools/craft-bridge-ident.md)
-- **raccontato in** [Manuale tecnico](../reference/craft-bridge.md)
+- **current rule in** [Shim modes](../architecture/shim-modes.md)
+- **measured with** [craft-bridge-ident](../tools/craft-bridge-ident.md)
+- **narrated in** [Technical manual](../reference/craft-bridge.md)
