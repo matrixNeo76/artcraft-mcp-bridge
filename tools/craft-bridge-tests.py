@@ -53,10 +53,36 @@ Report:
     `--no-compare` non legge niente. La destinazione si indica con `--report` (o
     `--out`, come gli altri strumenti del progetto).
 
+    **Una baseline per modalita'**: l'esecuzione completa scrive
+    `reports/craft-bridge-tests.json`, `--static` scrive `.static.json`, `--ci`
+    `.ci.json`, `--only X` `.only-X.json` (combinati: `.static.ci.json`). Non e'
+    pignoleria: con un nome solo per tutti, un `--only` sovrascrive in silenzio la
+    baseline completa, e da li' in poi il confronto (e la CI) guardano un file che non
+    descrive piu' l'insieme. Un `--report` esplicito scrive invece esattamente dove
+    dice l'utente.
+
+Cancello (le regressioni fermano un push):
+    il confronto non e' solo una lettura: se un caso **peggiora** rispetto alla
+    baseline salvata la suite esce con un codice suo (3), cosi' una regressione
+    blocca invece di finire in un report che nessuno apre. Gli stati sono ordinati
+    `PASS` < `SKIP` < `FAIL`: perdere una prova (PASS -> SKIP) e' un peggioramento
+    quanto smentirla (PASS -> FAIL), perche' una prova che non c'e' non e' una prova
+    passata; un caso che non viene piu' eseguito e' la stessa perdita vista da un
+    altro lato. Un miglioramento (FAIL -> PASS, SKIP -> PASS) e un caso nuovo non lo
+    fanno scattare.
+
+    Il cancello si applica solo quando il confronto ha senso: **stesso host** e
+    **stessi modi** (`--static`, `--only`, `--ci`) della baseline. Su un'altra
+    macchina o in un'altra modalita' la suite lo dichiara e non lo applica: due
+    ambienti diversi non si accusano a vicenda. `--no-gate` lo spegne (per guardare
+    un report senza che decida), `--no-report` lo spegne perche' non c'e' una
+    baseline da leggere.
+
 Esito:
-    0  ogni caso passato (le SKIP non sono guasti)
+    0  ogni caso passato e nessuna regressione (le SKIP non sono guasti)
     1  almeno un FAIL
     2  errore d'uso
+    3  nessun FAIL ma almeno una regressione rispetto alla baseline salvata
 """
 from __future__ import annotations
 
@@ -860,6 +886,89 @@ def t_flag_live(run: Runner) -> tuple[str, str]:
                     f"tabella, e la diagnosi lo ripete")
 
 
+@case("cancello sulle regressioni", "unit")
+def t_gate(run: Runner) -> tuple[str, str]:
+    """Il cancello, con report finti: quali peggioramenti fermano e quali no.
+
+    Il cancello decide un codice d'uscita, cioe' se un push si ferma: e' l'ultimo posto
+    in cui accettare un "sembra giusto". Qui si danno alla funzione i due report che
+    servono (stessi modi e stesso host, come nella realta') e si guarda cosa risponde,
+    comprese le due volte in cui **non deve** rispondere: un'altra macchina e un'altra
+    modalita'. La prova end-to-end del codice d'uscita e' un'altra cosa e sta nei
+    comandi (vedi docs/tools/craft-bridge-tests.md).
+    """
+    def fake(cases: dict, host: str = "prova", static: bool = False,
+             ci: bool = False, only=None) -> dict:
+        return {"when": "2026-01-01T00:00:00", "host": host,
+                "modes": {"static": static, "only": only, "ci": ci},
+                "cases": [{"case": n, "kind": "unit", "state": s, "detail": f"{n}: {s}",
+                           "seconds": 0.0} for n, s in cases.items()]}
+
+    problems = []
+    def want(condition: bool, why: str) -> None:
+        if not condition:
+            problems.append(why)
+
+    base = fake({"a": "PASS", "b": "FAIL", "c": "SKIP", "d": "PASS"})
+    rows, why = regressions(base, fake({"a": "FAIL", "b": "FAIL", "c": "SKIP", "d": "PASS"}))
+    want([(r["case"], r["from"], r["to"]) for r in rows] == [("a", "PASS", "FAIL")]
+         and not why, f"PASS->FAIL non accusato come vorrebbe: {rows} ({why})")
+
+    rows, _ = regressions(base, fake({"a": "PASS", "b": "PASS", "c": "PASS", "d": "PASS"}))
+    want(rows == [], f"un miglioramento (FAIL->PASS, SKIP->PASS) non ferma niente: {rows}")
+
+    rows, _ = regressions(base, fake({"a": "PASS", "b": "FAIL", "c": "SKIP", "d": "SKIP"}))
+    want([(r["case"], r["from"], r["to"]) for r in rows] == [("d", "PASS", "SKIP")],
+         f"perdere una prova (PASS->SKIP) deve fermare: {rows}")
+
+    rows, _ = regressions(base, fake({"a": "PASS", "b": "FAIL", "c": "SKIP"}))
+    want([(r["case"], r["to"]) for r in rows] == [("d", "assente")],
+         f"un caso non piu' eseguito e' la stessa perdita: {rows}")
+
+    rows, _ = regressions(base, fake({"a": "PASS", "b": "FAIL", "c": "SKIP", "d": "PASS",
+                                          "e": "FAIL"}))
+    want(rows == [], f"un caso nuovo non e' una regressione: {rows}")
+
+    rows, why = regressions(base, fake({"a": "FAIL"}, host="altra-macchina"))
+    want(rows == [] and "altra macchina" in why,
+         f"su un'altra macchina il cancello non si applica: {rows} ({why})")
+
+    rows, why = regressions(base, fake({"a": "FAIL"}, ci=True))
+    want(rows == [] and "--ci" in why,
+         f"--ci e non --ci non si confrontano: {rows} ({why})")
+
+    rows, why = regressions(base, fake({"a": "FAIL"}, static=True))
+    want(rows == [] and "modi diversi" in why,
+         f"--static contro una baseline completa non si confronta: {rows} ({why})")
+
+    rows, why = regressions(None, base)
+    want(rows == [] and "nessuna baseline" in why,
+         f"senza baseline non c'e' niente da difendere: {rows} ({why})")
+
+    # Una baseline per modalita': un `--only` non deve poter sovrascrivere la completa.
+    base_p = Path("reports") / "craft-bridge-tests.json"
+    got = [baseline_name(base_p, s, o, c).name
+           for s, o, c in ((False, None, False), (True, None, False), (False, None, True),
+                           (False, "finestra PdfCraft!", False), (True, "cancello", True))]
+    want(got == ["craft-bridge-tests.json", "craft-bridge-tests.static.json",
+                 "craft-bridge-tests.ci.json",
+                 "craft-bridge-tests.only-finestra-PdfCraft.json",
+                 "craft-bridge-tests.static.only-cancello.ci.json"],
+         f"nomi delle baseline: {got}")
+
+    # Il codice d'uscita: 1 batte 3 (un guasto vero e' un guasto vero), 3 c'e' solo
+    # quando l'unica cosa che non va e' la baseline peggiorata.
+    for failed, regressed, want_code in ((0, 0, 0), (0, 1, 3), (1, 0, 1), (1, 1, 1)):
+        got = exit_code(failed=failed, regressed=regressed)
+        want(got == want_code,
+             f"{failed} falliti e {regressed} regressioni dovrebbero dare {want_code}, non {got}")
+
+    if problems:
+        return "FAIL", "; ".join(problems)
+    return "PASS", ("sei peggioramenti accusati, quattro casi innocenti, due confronti "
+                    "rifiutati e i quattro codici d'uscita")
+
+
 @case("confronto col feed del launcher", "unit")
 def t_feed_compare(run: Runner) -> tuple[str, str]:
     """Il confronto installata/pubblicata, con un feed finto: niente rete, niente app."""
@@ -1170,7 +1279,8 @@ def t_bad_token(run: Runner) -> tuple[str, str]:
 
 ALL = [t_clean, t_stale_install, t_bad_entry, t_broken_path, t_missing_exe,
        t_locations, t_locations_live, t_feed_compare, t_feed_bytes, t_feed_missing,
-       t_feed_files, t_closed_port, t_good_build, t_drift_build, t_wrong_app, t_bad_token,
+       t_feed_files, t_gate,
+       t_closed_port, t_good_build, t_drift_build, t_wrong_app, t_bad_token,
        t_ui_args, t_ui_session, t_ui_headless, t_ui_live,
        t_flag_verdict, t_flag_doctor, t_flag_live]
 
@@ -1188,6 +1298,103 @@ def tool_hashes() -> dict:
         if path.is_file():
             out[name] = hashlib.sha256(path.read_bytes()).hexdigest()[:12]
     return out
+
+
+# Gli stati in ordine di gravita': `PASS` provato, `SKIP` non provato (dichiarato),
+# `FAIL` smentito. Perdere una prova sta in mezzo di proposito: non e' una smentita,
+# ma non e' nemmeno una prova, e per un cancello che ferma un push e' la cosa che si
+# vuole vedere ("la suite ha smesso di dimostrare questo").
+STATE_RANK = {"PASS": 0, "SKIP": 1, "FAIL": 2}
+
+
+def baseline_name(base: Path, static: bool, only: str | None, ci: bool) -> Path:
+    """Il nome della baseline, uno per modalita': `craft-bridge-tests.static.json`.
+
+    Una sola baseline condivisa non regge: `--static` o `--only` la sovrascriverebbero
+    con un'esecuzione parziale, e da quel momento il cancello (o il job che la confronta)
+    guarderebbe un file che non descrive piu' l'insieme. Provato: un `--only cancello`
+    ha ridotto la baseline completa a un caso, in silenzio. Ogni modalita' ha quindi il
+    suo file, accanto agli altri, e ognuna si confronta con la sua.
+    """
+    if not static and not ci and not only:
+        return base
+    parts = []
+    if static:
+        parts.append("static")
+    if only:
+        parts.append("only-" + re.sub(r"[^0-9A-Za-z._-]+", "-", only).strip("-"))
+    if ci:
+        parts.append("ci")
+    return base.with_name(f"{base.stem}.{'.'.join(parts)}{base.suffix}")
+
+
+def gate_modes(report: dict) -> tuple:
+    """Cosa rende due esecuzioni confrontabili: la modalita', non l'ora."""
+    modes = report.get("modes") or {}
+    return (bool(modes.get("static")), modes.get("only"), bool(modes.get("ci")))
+
+
+def regressions(previous: dict | None, report: dict) -> tuple[list[dict], str]:
+    """I casi peggiorati rispetto alla baseline, e perche' il cancello non si applica.
+
+    Non e' il confronto (quello racconta *tutto* cio' che e' cambiato, comprese le
+    impronte degli strumenti): qui si risponde a una domanda sola - la suite ha perso
+    o smentito qualcosa che la baseline dava per acquisito? - e si risponde solo dove
+    la domanda ha senso, cioe' **stesso host e stessi modi**: su un'altra macchina gli
+    stati non sono comparabili, e chiamarlo guasto sarebbe accusare l'ambiente.
+    """
+    if not previous:
+        return [], "nessuna baseline da confrontare"
+    if previous.get("host") != report.get("host"):
+        return [], (f"baseline di un'altra macchina ({previous.get('host')} != "
+                    f"{report.get('host')})")
+    if gate_modes(previous) != gate_modes(report):
+        was, now = gate_modes(previous), gate_modes(report)
+        if bool((previous.get("modes") or {}).get("ci")) != bool(report["modes"].get("ci")):
+            detail = "modi diversi: uno dei due e' --ci (i casi d'ambiente li' si saltano)"
+        else:
+            detail = f"modi diversi dalla baseline (static/only/ci {was} != {now})"
+        return [], detail
+    rows = []
+    old = {c["case"]: c for c in previous.get("cases", [])}
+    new = {c["case"]: c for c in report["cases"]}
+    for name, case in new.items():
+        was = old.get(name)
+        if was is None:                       # un caso nuovo non e' una regressione
+            continue
+        if STATE_RANK.get(case["state"], 0) > STATE_RANK.get(was["state"], 0):
+            rows.append({"case": name, "from": was["state"], "to": case["state"],
+                         "why": case["detail"]})
+    for name, was in old.items():
+        if name not in new:                   # stessa perdita, vista dall'altro lato
+            rows.append({"case": name, "from": was["state"], "to": "assente",
+                         "why": "non piu' eseguito in questa modalita'"})
+    return rows, ""
+
+
+def exit_code(failed: int, regressed: int) -> int:
+    """Il codice d'uscita: un guasto vero batte una regressione, perche' e' piu' grave.
+
+    Una funzione per una riga? Si': e' la riga che decide se un push si ferma, e cosi'
+    il caso `cancello sulle regressioni` la prova davvero invece di ripeterla a mano.
+    """
+    if failed:
+        return 1
+    if regressed:
+        return 3
+    return 0
+
+
+def gate_line(report: dict) -> str:
+    """Una riga sola sul cancello, anche quando non si applica."""
+    gate = report.get("gate") or {}
+    if not gate.get("applied"):
+        return f"cancello non applicato: {gate.get('why')}"
+    rows = report.get("regressions") or []
+    if not rows:
+        return "cancello: nessuna regressione rispetto alla baseline"
+    return (f"cancello: {len(rows)} regressione/i rispetto alla baseline "
+            f"({friendly(report.get('compared_with'))})")
 
 
 def build_report(results: list[dict], args, seconds: float, previous: dict | None) -> dict:
@@ -1294,6 +1501,23 @@ def markdown(report: dict, changes: list[str], previous: dict | None) -> str:
         lines.append(f"Rispetto al report del {friendly(previous.get('when'))}:")
         lines += [""] + [f"- {row}" for row in changes]
     lines += ["", duration_line(report), ""]
+    # Il cancello ha una sezione sua: il confronto racconta cosa e' cambiato, questa
+    # dice se qualcosa e' **peggiorato**, che e' la domanda per cui si ferma un push.
+    rows = report.get("regressions") or []
+    applied = (report.get("gate") or {}).get("applied")
+    lines += ["", "## Regressioni (cancello)", ""]
+    if not rows:
+        lines.append("Nessuna regressione: la baseline regge." if applied else
+                     f"Niente da confrontare: {(report.get('gate') or {}).get('why')}.")
+    else:
+        lines.append(("Peggiorati rispetto alla baseline "
+                      f"({friendly(report.get('compared_with'))}), uscita 3:") if applied else
+                     ("Peggiorati rispetto alla baseline "
+                      f"({friendly(report.get('compared_with'))}), ma il cancello non decide: "
+                      f"{(report.get('gate') or {}).get('why')}:"))
+        lines += [""] + [f"- `{r['case']}`: {r['from']} -> **{r['to']}** ({r['why']})"
+                         for r in rows]
+    lines += [""]
     return "\n".join(lines)
 
 
@@ -1310,23 +1534,32 @@ def main() -> int:
                              "installato su questa macchina (per un runner di CI)")
     parser.add_argument("--only", help="filtra per nome (sottostringa)")
     parser.add_argument("--json", action="store_true")
-    parser.add_argument("--report", "--out", dest="report", default=str(DEFAULT_REPORT),
-                        help="dove scrivere i report (default: reports/ nel progetto; il "
-                             "markdown prende lo stesso nome, .md); `--out` come negli altri "
-                             "strumenti del progetto")
+    parser.add_argument("--report", "--out", dest="report", default=None,
+                        help="dove scrivere i report (default: reports/ nel progetto, con la "
+                             "modalita' nel nome: `craft-bridge-tests.json` per l'esecuzione "
+                             "completa, `.static.json` con --static, `.ci.json` con --ci, "
+                             "`.only-<filtro>.json` con --only; il markdown prende lo stesso "
+                             "nome, .md); `--out` come negli altri strumenti del progetto")
     parser.add_argument("--no-report", action="store_true", help="non scrivere niente su disco")
     parser.add_argument("--compare",
                         help="confronta con un report precedente "
                              "(default: il report stesso, cioe' l'esecuzione precedente)")
     parser.add_argument("--no-compare", action="store_true")
+    parser.add_argument("--no-gate", action="store_true",
+                        help="confronta senza decidere: una regressione rispetto alla "
+                             "baseline non cambia il codice d'uscita")
     args = parser.parse_args()
 
+    # La baseline e' quella della **propria** modalita': la completa resta la completa
+    # anche se poi gira un `--static` (vedi `baseline_name`).
+    target = Path(args.report) if args.report else baseline_name(DEFAULT_REPORT, args.static,
+                                                               args.only, args.ci)
     # Il confronto e' automatico col report che si sta per sovrascrivere: basta
     # rieseguire la suite nella stessa cartella per vedere cosa e' cambiato.
     previous, previous_from = None, None
     if not args.no_compare:
         previous_from = Path(args.compare) if args.compare else (
-            None if args.no_report else Path(args.report))
+            None if args.no_report else target)
         if previous_from is not None:
             if previous_from.is_file():
                 try:
@@ -1375,9 +1608,19 @@ def main() -> int:
     report = build_report(results, args, time.time() - started_all, previous)
     changes = compare(previous, report)
     report["changes"] = changes
+    # Il cancello legge la baseline, non il report che si sta scrivendo: se la modalita'
+    # non combacia (o la baseline non c'e') lo dice e non decide niente, invece di
+    # accusare l'ambiente di una differenza che non e' un guasto. `--no-gate` toglie la
+    # decisione, non la misura: cosa e' peggiorato resta scritto nel report.
+    rows, why = regressions(previous, report)
+    if args.no_gate and not why:
+        why = "--no-gate: le regressioni sono registrate ma non decidono l'uscita"
+    report["regressions"] = rows
+    report["gate"] = {"applied": not why, "why": why}
+    report["regressed"] = len(rows)
 
     if not args.no_report:
-        json_path = Path(args.report)
+        json_path = target
         md_path = json_path.with_suffix(".md")
         report["report_files"] = {"json": str(json_path), "markdown": str(md_path)}
         try:
@@ -1411,10 +1654,15 @@ def main() -> int:
                 for row in changes:
                     print(f"  - {plain(row)}")
             print(f"  {duration_line(report)}")
+        if rows:
+            print("\nregressioni rispetto alla baseline:")
+            for row in rows:
+                print(f"  - {row['case']}: {row['from']} -> {row['to']} ({row['why']})")
+        print(f"\n{gate_line(report)}")
         if report.get("report_files"):
             print(f"\nreport: {report['report_files']['json']}"
                   f"  ·  {report['report_files']['markdown']}")
-    return 1 if failed else 0
+    return exit_code(len(failed), len(rows) if not args.no_gate else 0)
 
 
 if __name__ == "__main__":

@@ -51,7 +51,14 @@ python tools/craft-bridge-tests.py           # ~72 s, including the cases with r
 
 CI runs `python tools/craft-bridge-tests.py --static --ci`: `--ci` skips the cases that
 require the bridge **explaining why**, and it must never be used to make a real machine pass
-(there the skips do not happen, and a real fault stays a FAIL). The workflow steps can be run
+(there the skips do not happen, and a real fault stays a FAIL).
+
+The suite also **decides**, not only reports: exit `1` is a failed case, exit `3` is a case that
+got worse than the saved baseline (`reports/craft-bridge-tests.json`), and in CI both stop the
+push. The comparison only applies on the same host and in the same mode, and it says so when it
+does not; `--no-gate` removes the decision but not the measurement. If you change the cases or the
+installed state on purpose, refresh the baseline in the same commit - and refresh it in the state
+CI runs in (the apps closed), otherwise you are demanding an open window from every later push. The workflow steps can be run
 locally by extracting them from `.github/workflows/checks.yml` and running them with
 `powershell -NoProfile -ExecutionPolicy Bypass -File step.ps1`.
 

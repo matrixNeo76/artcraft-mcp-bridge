@@ -21,7 +21,7 @@ sources:
 |---|---|---|
 | `python tools/craft-bridge-doctor.py` | is the assembly healthy? which actions are needed? | ~2.4 s (apps closed) |
 | `python tools/craft-bridge-verify.py` | does every entry in the config really answer? | tens of seconds |
-| `python tools/craft-bridge-tests.py` | do the tools see the faults when there are any? | ~72 s (~34 s with `--static`, 19 of the 23 cases) |
+| `python tools/craft-bridge-tests.py` | do the tools see the faults when there are any, and has anything got worse than the baseline? | ~76 s (~36 s with `--static`, 20 of the 24 cases) |
 | `python tools/craft-bridge-feed.py` | is the installed app the one the launcher publishes? | ~0.9 s |
 
 # Recommended order
@@ -42,6 +42,12 @@ sources:
 The suite compares every run with the previous one: outcomes that changed, cases that
 appeared or disappeared, fingerprints of the tools. Look at the *Comparison* section of
 `reports/craft-bridge-tests.md`. See [Reports and baseline](../architecture/reports.md).
+
+The section to read first is **Regressioni**: it answers one question - did the suite lose or
+contradict something the baseline took for granted? - and the answer decides the exit code
+(3). It says "cancello non applicato" with the reason when the comparison would not mean
+anything (another host, another mode), which is not the same as "nothing got worse": the
+first is *not measured*, the second is *measured and quiet*.
 
 # Typical symptoms
 

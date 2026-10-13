@@ -1,10 +1,10 @@
 ---
 type: Tool
 title: "craft-bridge-tests - the suite that injects faults"
-description: "Twenty-three cases that break something on purpose and demand the right verdict from shim, translator, doctor, ident and launcher; every run leaves a report compared with the previous one."
+description: "Twenty-four cases that break something on purpose and demand the right verdict from shim, translator, doctor, ident and launcher; every run leaves a report compared with the saved baseline, and a case that gets worse stops the run with its own exit code."
 resource: ../../tools/craft-bridge-tests.py
 tags: [tool, tests, faults, report]
-generated: { by: process:freebuff-buffy, at: 2026-10-13T14:26:01Z }
+generated: { by: process:freebuff-buffy, at: 2026-10-13T19:55:00Z }
 status: stable
 sources:
 - resource: ../../tools/craft-bridge-tests.py
@@ -23,6 +23,12 @@ path, build 0.5.0 on the port, another app on the port, refused credential, clos
 published/installed feed and bytes, arguments and catalogue of the PdfCraft translator, a
 table that declares a flag the CLI help does not confirm), asks the tools for the verdict,
 demands the right outcome and puts things back.
+
+One case concerns **the gate itself**, on fake reports and with no machine: which worsenings stop
+the run (PASS → FAIL, PASS → SKIP, SKIP → FAIL, a case that is no longer run), which do not (a
+case that appears, FAIL → PASS), and the two comparisons that must be **refused** because they
+would accuse the environment instead of the code (another host, another mode). It also asks the
+exit-code function, so the mapping `0/1/3` is proved where it is written.
 
 Three cases concern the **attach flag**: the six verdicts of the comparison with the CLI
 help (on fake CLIs, with no app), the `doctor` line in both directions - a table not
@@ -53,11 +59,12 @@ really needs nothing, because there the fake CLI **is** the headless server.
 # Interface
 
 ```
-python tools/craft-bridge-tests.py                 # everything (~72 s, starts real apps)
-python tools/craft-bridge-tests.py --static        # only the cases without apps (~34 s, 19 of 23)
+python tools/craft-bridge-tests.py                 # everything (~76 s, starts real apps)
+python tools/craft-bridge-tests.py --static        # only the cases without apps (~36 s, 20 of 24)
 python tools/craft-bridge-tests.py --only build --json
 python tools/craft-bridge-tests.py --report reports/my.json --compare old.json
 python tools/craft-bridge-tests.py --static --ci   # on a runner without an installed bridge
+python tools/craft-bridge-tests.py --no-gate       # compare, but do not decide the exit code
 ```
 
 # `--ci`
@@ -67,7 +74,7 @@ copies, the cases that talk about the bridge are **skipped with the reason** ins
 failing. A real fault stays a FAIL: the mode changes what an absent environment is, not
 what a fault is. The three proofs, all run before publishing it:
 
-1. on a machine with the bridge, `--static --ci` gives **19/19 and no skips** (and 23/23 on
+1. on a machine with the bridge, `--static --ci` gives **20/20 and no skips** (and 24/24 on
    the whole suite);
 2. on a machine with no bridge (this repo's checkout, empty environment), it gives
    **11 passed + 8 skipped** and exits 0;
@@ -84,6 +91,35 @@ Every run writes `reports/craft-bridge-tests.json` (machine) and
 cases changed, appeared, disappeared, fingerprints of the tools. Duration is context.
 `--no-report` writes nothing, `--no-compare` reads nothing.
 
+# The gate on regressions
+
+A comparison nobody acts on is a report nobody reads, so the comparison **decides**: when a case
+gets worse than the baseline the suite exits **3**, and in CI that is a red push instead of a
+paragraph in an artifact. Which worsenings count:
+
+| Baseline | Now | Verdict |
+|---|---|---|
+| PASS | FAIL | worse: the proof is contradicted |
+| PASS | SKIP | worse: a proof that is not there is not a passed proof |
+| SKIP | FAIL | worse |
+| PASS | not run any more | worse: same loss, seen from the other side |
+| FAIL | PASS, SKIP | PASS | better (or still unproven): it does not stop anything |
+| - | new case | a new case is not a regression |
+
+It applies **only where the comparison means something**: same host and same modes
+(`static`, `only`, `ci`). On another machine, or against a `--ci` baseline, the run says so and
+does not decide - two different environments must not accuse each other, and the hosted job
+(`--static --ci`) therefore never gates. `--no-gate` removes the decision but not the
+measurement: what got worse is still listed and still written in the report. `--no-report`
+removes both, because with no file written there is nothing saved to compare against.
+
+Which baseline? The saved one: in CI it is the committed
+[report and baseline](../architecture/reports.md), so every push is measured against a
+**decision**; locally it is the run before, so accepting a regression and running again is a
+deliberate act, which is exactly what "saving a baseline" means. Refresh it in the state you
+expect CI to be in (the apps closed): a baseline taken with the PdfCraft window open is a
+baseline that demands the window open.
+
 # Safety rules
 
 The real config is never written (the cases exercise it on a copy with `--config`); the
@@ -96,9 +132,10 @@ disappear at the end.
 
 | Exit | Meaning |
 |---|---|
-| 0 | every case passed (SKIP is not a fault) |
+| 0 | every case passed and nothing got worse (SKIP is not a fault) |
 | 1 | at least one FAIL |
 | 2 | usage error |
+| 3 | no FAIL, but at least one case got worse than the saved baseline |
 
 # Defects found by this suite
 
@@ -111,6 +148,6 @@ disappear at the end.
 - **and the translator** [craft-bridge-ui](craft-bridge-ui.md) - arguments, MCP session, fallback and live window
 - **and the attach flag** [craft-bridge-mcp](craft-bridge-mcp.md) - against the help of every CLI (fake CLIs, and live)
 - **and the paths** [Where the app is](../architecture/app-locations.md) - the three outcomes of the choice, without touching the registry
-- **produces** [Reports and baseline](../architecture/reports.md)
+- **decides against the saved baseline** [Reports and baseline](../architecture/reports.md)
 - **in the runbook** [Diagnosis and verification](../operations/diagnosis.md)
 - **run on every push by** [Continuous integration](../operations/ci.md) with `--static --ci`

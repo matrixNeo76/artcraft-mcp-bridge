@@ -66,7 +66,7 @@ Ripristino headless: `python tools/craft-bridge-config.py --restore`.
 |---|---|
 | App guidabili con una chiamata riuscita sulla finestra | 12 su 12 (11 in bridged dallo shim, PdfCraft per traduzione) |
 | Entry della config eseguite col comando reale | 13/13 |
-| Suite di guasti (23 casi, guasti iniettati) | 23/23, due giri di fila identici |
+| Suite di guasti (24 casi, guasti iniettati) | 23/23 eseguiti, 1 saltato con la ragione (finestra PdfCraft chiusa), due giri di fila identici |
 | Installata contro la release pubblicata dal launcher | 12 su 12 allineate (feed del 13 ottobre) |
 | Byte della CLI installata contro quelli pubblicati | 1 su 11 provata: SoundCraft identico (`sha256 915ee3abb121…`); per le altre l'archivio non è sul disco |
 | Percorsi di app e CLI | 11 su 11 dal registro `App Paths` (la tabella conferma, non decide) |
@@ -110,9 +110,9 @@ tabella delle app con le porte documentate, determinismo dell'installer, conform
 e la suite con `--ci` — che su un runner senza app salta i casi d'ambiente **motivandoli**, mentre
 un guasto vero resta un FAIL. La suite intera gira su un runner self-hosted dove il ponte è
 installato (variabile di repo `CRAFTBRIDGE_SELF_HOSTED=1`): è attiva sui push in `main` e sugli
-avvii manuali, mai sulle pull request — il repository è pubblico, e il codice di uno sconosciuto
-non gira sulla macchina che ha le app.
-Dettagli in [docs/operations/ci.md](docs/operations/ci.md).
+avvii manuali, mai sulle pull request — il repository è pubblico, e il codice di uno sconosciutonon gira sulla macchina che ha le app. Un caso che peggiora rispetto alla baseline salvata esce con
+3, così una regressione ferma il push invece di aspettare in un report. Dettagli in
+[docs/operations/ci.md](docs/operations/ci.md).
 
 ## Limiti dichiarati
 

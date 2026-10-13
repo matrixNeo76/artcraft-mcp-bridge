@@ -1,5 +1,5 @@
 {
-  "when": "2026-10-13T19:53:26",
+  "when": "2026-10-13T22:00:38",
   "host": "wkai01",
   "python": "3.12.10",
   "modes": {
@@ -11,9 +11,9 @@
     "craft-bridge-mcp.py": "e63385cf6422",
     "craft-bridge-ident.py": "8df181789548",
     "craft-bridge-doctor.py": "095fb4828ac5",
-    "craft-bridge-config.py": "1fe109470c98",
+    "craft-bridge-config.py": "236ff781b8ee",
     "craft-bridge-feed.py": "c65b3ac8ee1a",
-    "craft-bridge-tests.py": "e2187709e4f8",
+    "craft-bridge-tests.py": "92b472ab9bfa",
     "craft-bridge-ui.py": "bed1af7f410d"
   },
   "cases": [
@@ -22,28 +22,28 @@
       "kind": "static",
       "state": "PASS",
       "detail": "doctor: nessuna azione",
-      "seconds": 2.4
+      "seconds": 2.8
     },
     {
       "case": "shim installato stantio",
       "kind": "static",
       "state": "PASS",
       "detail": "accusato e riparato dall'azione indicata",
-      "seconds": 5.1
+      "seconds": 5.9
     },
     {
       "case": "entry di config sbagliata",
       "kind": "static",
       "state": "PASS",
       "detail": "doctor e installer concordano: 1 entry da aggiornare",
-      "seconds": 2.7
+      "seconds": 3.1
     },
     {
       "case": "percorso inesistente",
       "kind": "static",
       "state": "PASS",
       "detail": "FIX percorsi: cadcraft.command",
-      "seconds": 2.3
+      "seconds": 2.7
     },
     {
       "case": "eseguibile mancante",
@@ -92,7 +92,14 @@
       "kind": "static",
       "state": "PASS",
       "detail": "assente 3, illeggibile 3, estraneo 0 (nessun guasto inventato)",
-      "seconds": 2.7
+      "seconds": 2.5
+    },
+    {
+      "case": "cancello sulle regressioni",
+      "kind": "unit",
+      "state": "PASS",
+      "detail": "sei peggioramenti accusati, quattro casi innocenti, due confronti rifiutati e i quattro codici d'uscita",
+      "seconds": 0.0
     },
     {
       "case": "porta chiusa",
@@ -106,28 +113,28 @@
       "kind": "e2e",
       "state": "PASS",
       "detail": "gridcraft 7975: ident/doctor/launcher tutti d'accordo",
-      "seconds": 10.2
+      "seconds": 10.7
     },
     {
       "case": "build diversa",
       "kind": "e2e",
       "state": "PASS",
       "detail": "doctor, ident e launcher: tutti e tre exit 1 con 0.5.0 != 0.6.1",
-      "seconds": 11.4
+      "seconds": 12.0
     },
     {
       "case": "altra app sulla porta",
       "kind": "e2e",
       "state": "PASS",
       "detail": "GridCraft su 7972: doctor e ident lo riconoscono",
-      "seconds": 8.6
+      "seconds": 9.1
     },
     {
       "case": "credenziale rifiutata",
       "kind": "e2e",
       "state": "PASS",
       "detail": "token diverso: accusato da doctor e ident (valore mai stampato)",
-      "seconds": 7.1
+      "seconds": 7.5
     },
     {
       "case": "argomenti della chiamata",
@@ -141,21 +148,21 @@
       "kind": "unit",
       "state": "PASS",
       "detail": "15 tool, parametri tipizzati, immagine, isError su guasto, -32602 sull'ignoto, modo bridged dichiarato, finestra sparita a meta' sessione diagnosticata",
-      "seconds": 3.5
+      "seconds": 3.4
     },
     {
       "case": "senza finestra il traduttore ripiega",
       "kind": "unit",
       "state": "PASS",
       "detail": "nessuna finestra: il server headless del fornitore passa attraverso, dichiarato",
-      "seconds": 0.6
+      "seconds": 0.5
     },
     {
       "case": "finestra PdfCraft dal vivo",
       "kind": "static",
-      "state": "PASS",
-      "detail": "porta 48129 (pid 42336), 15 metodi come li dichiara l'app",
-      "seconds": 0.6
+      "state": "SKIP",
+      "detail": "finestra chiusa (nessuno in ascolto sulla porta 48129 (file stantio?)): l'entry va headless",
+      "seconds": 0.8
     },
     {
       "case": "flag di aggancio, verificato",
@@ -169,26 +176,30 @@
       "kind": "unit",
       "state": "PASS",
       "detail": "tabella non confermata -> FIX con l'azione; confermata dal canale -> ok; CLI assente -> nota",
-      "seconds": 5.7
+      "seconds": 5.0
     },
     {
       "case": "flag di aggancio dal vivo",
       "kind": "static",
       "state": "PASS",
       "detail": "11/11 CLI documentano il flag della tabella, e la diagnosi lo ripete",
-      "seconds": 2.6
+      "seconds": 3.1
     }
   ],
   "passed": 23,
   "failed": 0,
-  "skipped": 0,
+  "skipped": 1,
   "ok": true,
-  "seconds": 72.3,
-  "compared_with": "2026-10-13T19:46:39",
-  "previous_seconds": 70.5,
-  "changes": [
-    "`craft-bridge-tests.py`: 65ed0b8a16fe -> e2187709e4f8"
-  ],
+  "seconds": 76.4,
+  "compared_with": "2026-10-13T21:59:21",
+  "previous_seconds": 76.2,
+  "changes": [],
+  "regressions": [],
+  "gate": {
+    "applied": true,
+    "why": ""
+  },
+  "regressed": 0,
   "report_files": {
     "json": "C:\\Users\\auresystem\\repos\\artcraft-mcp-bridge\\reports\\craft-bridge-tests.json",
     "markdown": "C:\\Users\\auresystem\\repos\\artcraft-mcp-bridge\\reports\\craft-bridge-tests.md"

@@ -66,7 +66,7 @@ Vuelta a headless: `python tools/craft-bridge-config.py --restore`.
 |---|---|
 | Aplicaciones pilotables con una llamada correcta sobre la ventana | 12 de 12 (11 en bridged por el shim, PdfCraft por traducción) |
 | Entradas de configuración ejecutadas con el comando real | 13/13 |
-| Suite de fallos (23 casos, fallos inyectados) | 23/23, dos pasadas seguidas idénticas |
+| Suite de fallos (24 casos, fallos inyectados) | 23/23 ejecutados, 1 omitido con el motivo (ventana de PdfCraft cerrada), dos pasadas seguidas idénticas |
 | Instalado frente a la release publicada por el launcher | 12 de 12 alineadas (feed del 13 de octubre) |
 | Bytes de la CLI instalada frente a los publicados | 1 de 11 probada: SoundCraft idéntico (`sha256 915ee3abb121…`); para las demás el archivo no está en disco |
 | Rutas de aplicación y CLI | 11 de 11 desde el registro `App Paths` (la tabla confirma, no decide) |
@@ -113,7 +113,8 @@ bundle OKF y la suite con `--ci` — que en un runner sin aplicaciones omite los
 ejecuta en un runner self-hosted donde el puente está instalado (variable de repo
 `CRAFTBRIDGE_SELF_HOSTED=1`): está activa en los push a `main` y en las ejecuciones manuales,
 nunca en las pull requests — el repositorio es público, y el código de un desconocido no se
-ejecuta en la máquina que tiene las aplicaciones.
+ejecuta en la máquina que tiene las aplicaciones. Un caso que empeora respecto a la baseline
+guardada sale con 3, así una regresión frena el push en lugar de esperar en un informe.
 Detalles en [docs/operations/ci.md](docs/operations/ci.md).
 
 ## Límites declarados

@@ -168,17 +168,26 @@ alone, or the runner alone, changes nothing.
 | Step | What it does |
 |---|---|
 | Diagnosis | `craft-bridge-doctor.py`; a non-zero exit fails the job with the actions it listed |
-| Full suite | `craft-bridge-tests.py` **without** `--ci`: here the absent-environment skips are not forgiven |
+| Full suite | `craft-bridge-tests.py` **without** `--ci`: here the absent-environment skips are not forgiven, and the gate on regressions applies - a case that gets worse than the committed baseline exits 3 and the job fails |
 | Artifact | `craft-bridge-tests-selfhosted` (the hosted job's is `craft-bridge-tests`: two different names, so the two runs do not overwrite each other) |
 
 The steps use `powershell`, not `pwsh` - see above.
 
-Measured on the first green run (the push of 2026-10-13 that wrote this node): **23 cases, 22 PASS,
-1 SKIP, 0 FAIL, 74 s**, on the machine that has the apps. The skip is the declared one: *live
-PdfCraft window* - the window was closed, so the entry would go headless, which is not a fault.
-Among the 22 that ran there are the ones that start a real app (*app on the port*, *different
-build*, *another app on the port*, *refused credential*, *attach flag, live*): those are the cases
-this job exists for.
+Measured on the machine that has the apps: **24 cases, 23 PASS, 1 SKIP, 0 FAIL, ~76 s**. The skip is
+the declared one: *live PdfCraft window* - the window was closed, so the entry would go headless,
+which is not a fault. Among the 23 that ran there are the ones that start a real app (*app on the
+port*, *different build*, *another app on the port*, *refused credential*, *attach flag, live*):
+those are the cases this job exists for.
+
+# The baseline this job measures against
+
+The comparison reads `reports/craft-bridge-tests.json` **from the checkout** (the complete run's
+baseline; the `--static` one has its own file, `.static.json`), so every push is compared with the
+state someone last committed, not with the run before: a regression cannot age away by itself. When it fires, two honest answers exist - fix the cause, or refresh the baseline
+in the same commit, which is a decision and not an accident. Refresh it in the state CI runs in
+(the apps closed): a baseline taken with the PdfCraft window open would make every later push
+red for a closed window. The gate itself is in
+[craft-bridge-tests](../tools/craft-bridge-tests.md).
 
 # The steps of the hosted job
 
@@ -189,7 +198,7 @@ this job exists for.
 | App table | the 11 documented apps and ports | the table is a single source: config and diagnosis read this one |
 | Deterministic installer | two rounds of `--json` identical, and the entries are the shim's 11 plus the translator's one | idempotence, and the number is asked of the table instead of being written here: the fixed count went stale the first time an app changed road (expected 11, produced 12) |
 | OKF bundle | `uvx --from "okfgen==0.1.3" okfgen validate docs --strict` | the documentation stays consumable by another tool; the version is pinned so it does not depend on the newest release |
-| Suite | `craft-bridge-tests.py --static --ci` | the cases runnable without the bridge, with motivated skips |
+| Suite | `craft-bridge-tests.py --static --ci` | the cases runnable without the bridge, with motivated skips. The gate on regressions does **not** apply here: a `--static --ci` run has its own baseline name (`craft-bridge-tests.static.ci.json`), which inside a fresh checkout does not exist yet |
 | Artifact | `reports/craft-bridge-tests.*` | the run report stays downloadable, even if the run fails |
 
 # What `--ci` means

@@ -65,7 +65,7 @@ Back to headless: `python tools/craft-bridge-config.py --restore`.
 |---|---|
 | Apps driveable with a successful call on the window | 12 of 12 (11 bridged through the shim, PdfCraft by translation) |
 | Config entries run with the real command | 13/13 |
-| Fault suite (23 cases, injected faults) | 23/23, two runs in a row identical |
+| Fault suite (24 cases, injected faults) | 23/23 run, 1 skipped with a reason (PdfCraft window closed), two runs in a row identical |
 | Installed against the release published by the launcher | 12 of 12 aligned (feed of 13 October) |
 | Bytes of the installed CLI against the published ones | 1 of 11 tried: SoundCraft identical (`sha256 915ee3abb121…`); for the others the archive is not on disk |
 | App and CLI paths | 11 of 11 from the `App Paths` registry (the table confirms, it does not decide) |
@@ -109,9 +109,8 @@ determinism of the installer, conformance of the OKF bundle and the suite with `
 runner without apps skips the environment cases **with the reason**, while a real fault stays a
 FAIL. The whole suite runs on a self-hosted runner where the bridge is installed (repository variable
 `CRAFTBRIDGE_SELF_HOSTED=1`): it is active on pushes to `main` and on manual runs, never on pull
-requests — the repository is public, and a stranger's code does not run on the machine that has
-the apps.
-Details in [docs/operations/ci.md](docs/operations/ci.md).
+requests — the repository is public, and a stranger's code does not run on the machine that hasthe apps. A case that gets worse than the saved baseline exits 3, so a regression stops the push
+instead of waiting in a report. Details in [docs/operations/ci.md](docs/operations/ci.md).
 
 ## Declared limits
 

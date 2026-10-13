@@ -173,11 +173,19 @@ jobs:
           python tools/craft-bridge-doctor.py
           if ($LASTEXITCODE -ne 0) { throw "la diagnosi ha trovato problemi: vedi le azioni sopra" }
 
+      # Il codice d'uscita della suite distingue due cose diverse, e qui si dice
+      # quale delle due e' successa invece di chiamarle tutte "guasto": `1` un caso
+      # fallito, `3` nessun caso fallito ma una **regressione** rispetto alla baseline
+      # salvata (`reports/craft-bridge-tests.json`, confrontata solo a parita' di
+      # macchina e di modi). Il confronto con la baseline e' quello del checkout, non
+      # quello dell'esecuzione precedente: una regressione non invecchia via da sola.
       - name: Suite completa (avvia app vere su porte libere)
         shell: powershell
         run: |
           python tools/craft-bridge-tests.py
-          if ($LASTEXITCODE -ne 0) { throw "la suite ha trovato un guasto" }
+          if ($LASTEXITCODE -eq 1) { throw "la suite ha trovato un guasto: vedi il report" }
+          if ($LASTEXITCODE -eq 3) { throw "regressione rispetto alla baseline: vedi la sezione Regressioni del report" }
+          if ($LASTEXITCODE -ne 0) { throw "la suite e' uscita con $LASTEXITCODE" }
 
       - name: Report della suite
         if: always()

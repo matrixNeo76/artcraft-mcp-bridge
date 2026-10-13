@@ -1,0 +1,179 @@
+{
+  "when": "2026-10-13T22:01:19",
+  "host": "wkai01",
+  "python": "3.12.10",
+  "modes": {
+    "static": true,
+    "only": null,
+    "ci": false
+  },
+  "tools": {
+    "craft-bridge-mcp.py": "e63385cf6422",
+    "craft-bridge-ident.py": "8df181789548",
+    "craft-bridge-doctor.py": "095fb4828ac5",
+    "craft-bridge-config.py": "236ff781b8ee",
+    "craft-bridge-feed.py": "c65b3ac8ee1a",
+    "craft-bridge-tests.py": "92b472ab9bfa",
+    "craft-bridge-ui.py": "bed1af7f410d"
+  },
+  "cases": [
+    {
+      "case": "stato pulito",
+      "kind": "static",
+      "state": "PASS",
+      "detail": "doctor: nessuna azione",
+      "seconds": 2.8
+    },
+    {
+      "case": "shim installato stantio",
+      "kind": "static",
+      "state": "PASS",
+      "detail": "accusato e riparato dall'azione indicata",
+      "seconds": 5.9
+    },
+    {
+      "case": "entry di config sbagliata",
+      "kind": "static",
+      "state": "PASS",
+      "detail": "doctor e installer concordano: 1 entry da aggiornare",
+      "seconds": 3.1
+    },
+    {
+      "case": "percorso inesistente",
+      "kind": "static",
+      "state": "PASS",
+      "detail": "FIX percorsi: cadcraft.command",
+      "seconds": 2.8
+    },
+    {
+      "case": "eseguibile mancante",
+      "kind": "unit",
+      "state": "PASS",
+      "detail": "lightcraft app, lightcraft cli",
+      "seconds": 0.2
+    },
+    {
+      "case": "posizione dell'app dal sistema",
+      "kind": "unit",
+      "state": "PASS",
+      "detail": "registro prima, tabella poi, e l'assenza si dichiara; l'avvio prende l'eseguibile registrato",
+      "seconds": 0.0
+    },
+    {
+      "case": "app registrate dal sistema",
+      "kind": "static",
+      "state": "PASS",
+      "detail": "11/11 percorsi dal registro App Paths, hive utente e macchina, tabella confermata, avvio sull'eseguibile registrato",
+      "seconds": 0.0
+    },
+    {
+      "case": "confronto col feed del launcher",
+      "kind": "unit",
+      "state": "PASS",
+      "detail": "9 righe: dietro, pari, assente, estraneo e i tre casi di byte",
+      "seconds": 0.0
+    },
+    {
+      "case": "byte pubblicati contro installati",
+      "kind": "unit",
+      "state": "PASS",
+      "detail": "uguali ok, diversi FIX, archivio manomesso FIX, assente nota, cli_zip preferito",
+      "seconds": 0.1
+    },
+    {
+      "case": "feed assente non e' un guasto",
+      "kind": "unit",
+      "state": "PASS",
+      "detail": "doctor: nota con la ragione, non un FIX",
+      "seconds": 0.2
+    },
+    {
+      "case": "feed illeggibile o estraneo",
+      "kind": "static",
+      "state": "PASS",
+      "detail": "assente 3, illeggibile 3, estraneo 0 (nessun guasto inventato)",
+      "seconds": 2.5
+    },
+    {
+      "case": "cancello sulle regressioni",
+      "kind": "unit",
+      "state": "PASS",
+      "detail": "sei peggioramenti accusati, quattro casi innocenti, due confronti rifiutati e i quattro codici d'uscita",
+      "seconds": 0.0
+    },
+    {
+      "case": "porta chiusa",
+      "kind": "live",
+      "state": "PASS",
+      "detail": "ident unreachable, shim headless (porta 7979)",
+      "seconds": 5.2
+    },
+    {
+      "case": "argomenti della chiamata",
+      "kind": "unit",
+      "state": "PASS",
+      "detail": "numeri, stringhe (virgolettate), liste, null e booleani come li vuole la CLI",
+      "seconds": 0.0
+    },
+    {
+      "case": "sessione del traduttore",
+      "kind": "unit",
+      "state": "PASS",
+      "detail": "15 tool, parametri tipizzati, immagine, isError su guasto, -32602 sull'ignoto, modo bridged dichiarato, finestra sparita a meta' sessione diagnosticata",
+      "seconds": 3.4
+    },
+    {
+      "case": "senza finestra il traduttore ripiega",
+      "kind": "unit",
+      "state": "PASS",
+      "detail": "nessuna finestra: il server headless del fornitore passa attraverso, dichiarato",
+      "seconds": 0.6
+    },
+    {
+      "case": "finestra PdfCraft dal vivo",
+      "kind": "static",
+      "state": "SKIP",
+      "detail": "finestra chiusa (nessuno in ascolto sulla porta 48129 (file stantio?)): l'entry va headless",
+      "seconds": 0.8
+    },
+    {
+      "case": "flag di aggancio, verificato",
+      "kind": "unit",
+      "state": "PASS",
+      "detail": "confermato, non confermato, flag diverso, assenza confermata e help illeggibile: sei verdetti, come li vuole l'help della CLI",
+      "seconds": 0.3
+    },
+    {
+      "case": "doctor: flag non confermato",
+      "kind": "unit",
+      "state": "PASS",
+      "detail": "tabella non confermata -> FIX con l'azione; confermata dal canale -> ok; CLI assente -> nota",
+      "seconds": 5.1
+    },
+    {
+      "case": "flag di aggancio dal vivo",
+      "kind": "static",
+      "state": "PASS",
+      "detail": "11/11 CLI documentano il flag della tabella, e la diagnosi lo ripete",
+      "seconds": 3.0
+    }
+  ],
+  "passed": 19,
+  "failed": 0,
+  "skipped": 1,
+  "ok": true,
+  "seconds": 36.0,
+  "compared_with": "2026-10-13T21:57:56",
+  "previous_seconds": 36.0,
+  "changes": [],
+  "regressions": [],
+  "gate": {
+    "applied": true,
+    "why": ""
+  },
+  "regressed": 0,
+  "report_files": {
+    "json": "C:\\Users\\auresystem\\repos\\artcraft-mcp-bridge\\reports\\craft-bridge-tests.static.json",
+    "markdown": "C:\\Users\\auresystem\\repos\\artcraft-mcp-bridge\\reports\\craft-bridge-tests.static.md"
+  }
+}

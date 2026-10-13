@@ -1,8 +1,9 @@
 # Roadmap
 
 State as of 13 October 2026: the bridge works and is verified (12/12 apps driveable, 13/13
-entries, 23/23 in the fault suite, diagnosis `tutto in ordine`). What follows is what is worth
-doing next, in order of value for cost.
+entries, 24/24 in the fault suite, diagnosis `tutto in ordine`), the whole suite runs on every
+push to `main` and a case that gets worse than the saved baseline stops the run. What follows is
+what is worth doing next, in order of value for cost.
 
 ## Done
 
@@ -11,14 +12,15 @@ doing next, in order of value for cost.
 - [x] App identity (command catalogue) and running build (PID, executable).
 - [x] Single diagnosis (`doctor`) with actions, idempotent installer (`config`), launcher.
 - [x] Repeatable proofs: `verify` (real entries), `sweep` (headless against bridged), `tests`
-      (23 injected faults), `report-mcp-tools` (tool inventory).
+      (24 injected faults), `report-mcp-tools` (tool inventory).
 - [x] Four real defects fixed at the cause and covered by the suite.
 - [x] Documentation in an OKF v0.2 bundle with nodes and relations, in English.
 
 ## Next (small, immediately useful)
 
-- [ ] **Regression gate**: the suite exits non-zero when a case gets worse than the baseline, so
-      a regression blocks instead of merely being read.
+- [x] **Regression gate**: the suite exits 3 when a case gets worse than the saved baseline
+      (PASS → SKIP counts: a proof that is not there is not a passed proof), the report records
+      what got worse, and CI fails on it. See [craft-bridge-tests](docs/tools/craft-bridge-tests.md).
 - [ ] **Append-only history** of runs (one line per run) to see the trend of outcomes and
       duration, instead of only the comparison with the previous run.
 - [ ] **Hook**: run `craft-bridge-tests.py --static` after changes to `tools/` that touch shim,
