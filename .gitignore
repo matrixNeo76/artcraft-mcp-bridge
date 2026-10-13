@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Report di prova o locali: i report versionati in reports/ restano tracciati
+reports/*.local.*
+reports/*.tmp.*
+reports/*.bak.*
+reports/*-logs/
+
+# Credenziali e stato locale: non entrano mai nel repo
+*.token
+.craft-bridge/
+photocraft.token
+.env
+.env.*
+
+# Log e temporanei
+*.log
+*.bak
+*.bak.*
+tmp/
+.DS_Store
+Thumbs.db

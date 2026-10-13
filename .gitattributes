@@ -1,0 +1,12 @@
+# Fine riga: LF nel repo e nel working tree, su ogni sistema.
+# Serve a un invariante di questo progetto: le copie installate sono confrontate
+# byte per byte col sorgente (craft-bridge-doctor.py), quindi il contenuto dei file
+# non deve dipendere dalle impostazioni git della macchina.
+* text=auto eol=lf
+
+# Binari: nessuna conversione
+*.png binary
+*.jpg binary
+*.exe binary
+*.ico binary
+*.woff2 binary

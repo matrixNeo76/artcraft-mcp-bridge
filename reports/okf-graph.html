@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OKF Bundle — docs</title>
+<style>
+  :root { --bg:#0f1420; --panel:#171e2e; --line:#2a3450; --fg:#e6ebf5; --muted:#8b98b8; --accent:#5b9dff; }
+  * { box-sizing: border-box; }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--fg);
+    font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; }
+  #app { display:flex; height:100vh; }
+  #side { width:320px; flex:0 0 320px; background:var(--panel); border-right:1px solid var(--line);
+    display:flex; flex-direction:column; overflow:hidden; }
+  #side h1 { font-size:15px; margin:0; padding:14px 16px; border-bottom:1px solid var(--line); }
+  #side h1 small { color:var(--muted); font-weight:400; display:block; font-size:11px; margin-top:2px; }
+  .pad { padding:12px 16px; }
+  input[type=search] { width:100%; padding:8px 10px; background:var(--bg); border:1px solid var(--line);
+    color:var(--fg); border-radius:6px; outline:none; }
+  input[type=search]:focus { border-color:var(--accent); }
+  .legend { overflow:auto; flex:1; }
+  .legend label { display:flex; align-items:center; gap:8px; padding:4px 16px; cursor:pointer; font-size:13px; }
+  .legend label:hover { background:rgba(255,255,255,.03); }
+  .swatch { width:12px; height:12px; border-radius:3px; flex:0 0 12px; }
+  .count { color:var(--muted); margin-left:auto; font-size:12px; }
+  #detail { border-top:1px solid var(--line); padding:14px 16px; max-height:42%; overflow:auto; }
+  #detail .t { font-size:12px; color:var(--accent); text-transform:uppercase; letter-spacing:.04em; }
+  #detail h2 { font-size:16px; margin:4px 0 8px; }
+  #detail a { color:var(--accent); word-break:break-all; }
+  #detail .tags span { display:inline-block; background:var(--bg); border:1px solid var(--line);
+    border-radius:10px; padding:1px 8px; margin:2px 4px 2px 0; font-size:11px; color:var(--muted); }
+  #detail ul { margin:6px 0; padding-left:18px; }
+  #detail li a { cursor:pointer; }
+  #main { flex:1; position:relative; }
+  canvas { display:block; width:100%; height:100%; }
+  #hint { position:absolute; bottom:10px; left:12px; color:var(--muted); font-size:12px; pointer-events:none; }
+  #empty { position:absolute; inset:0; display:none; align-items:center; justify-content:center; color:var(--muted); }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="side">
+    <h1>OKF Bundle — docs<small id="stats"></small></h1>
+    <div class="pad"><input id="q" type="search" placeholder="Search concepts…" autocomplete="off"></div>
+    <div class="legend" id="legend"></div>
+    <div id="detail"><span class="t">Tip</span><h2>Click a node</h2>
+      <div class="muted" style="color:var(--muted)">Explore the knowledge graph. Nodes are concepts; edges are markdown links between them.</div>
+    </div>
+  </div>
+  <div id="main">
+    <canvas id="cv"></canvas>
+    <div id="hint">drag to pan · scroll to zoom · click a node</div>
+    <div id="empty">No concepts match your search.</div>
+  </div>
+</div>
+<script id="data" type="application/json">{"okf_version": "0.2", "generated_from": "docs", "nodes": [{"id": "architecture/control-channel.md", "title": "Manuale tecnico completo", "type": "Protocol", "description": "Il protocollo JSON-lines che le app aprono con --control: messaggi, credenziale, porte attese e insidie misurate.", "resource": "../../tools/craft-bridge-ident.py", "tags": ["protocollo", "porte", "canale-di-controllo"], "degree": 9}, {"id": "architecture/identity.md", "title": "La suite che prova gli strumenti", "type": "Mechanism", "description": "Due domande distinte: chi risponde sulla porta (catalogo dei comandi, soglia 0,9) e quale versione gira davvero (PID, eseguibile, riga di avvio, builds.json).", "resource": "../../tools/craft-bridge-ident.py", "tags": ["identita", "build", "misura"], "degree": 7}, {"id": "architecture/installation-layout.md", "title": "Manuale tecnico completo", "type": "Mechanism", "description": "L'MCP globale non punta a questo repo ma a copie installate in %LOCALAPPDATA%: per questo riorganizzare o spostare il progetto non rompe i connettori.", "resource": "../../tools/craft-bridge-config.py", "tags": ["installazione", "mcp-globale", "deriva"], "degree": 9}, {"id": "architecture/reports.md", "title": "il report dello sweep", "type": "Mechanism", "description": "Tutti gli artefatti generati stanno in reports/ ed e' il default degli strumenti; la suite confronta da sola l'esecuzione corrente con la precedente.", "resource": "../../reports/craft-bridge-tests.json", "tags": ["report", "baseline", "confronto"], "degree": 6}, {"id": "architecture/shim-modes.md", "title": "La suite che prova gli strumenti", "type": "Design Decision", "description": "Lo shim non finge: fa l'handshake e decide. Peer assente, muto o estraneo portano in headless, dichiarandolo su stderr.", "resource": "../../tools/craft-bridge-mcp.py", "tags": ["shim", "bridged", "headless", "decisione"], "degree": 11}, {"id": "findings/auth-refused-crash.md", "title": "La suite che prova gli strumenti", "type": "Finding", "description": "Con un token sbagliato l'app chiude la connessione e la scrittura successiva alza ConnectionAbortedError: ident moriva con un traceback e non stampava il verdetto.", "resource": "../../tools/craft-bridge-ident.py", "tags": ["difetto", "credenziale", "rete"], "degree": 8}, {"id": "findings/silent-fallback.md", "title": "Manuale tecnico completo", "type": "Finding", "description": "Con un socket che accetta e tace, lo shim dichiarava bridged e la CLI rispondeva 25 tool senza errore: un headless travestito, indistinguibile dalla lista dei tool.", "resource": "../../tools/craft-bridge-mcp.py", "tags": ["difetto", "shim", "handshake"], "degree": 6}, {"id": "findings/stale-installed-files.md", "title": "La suite che prova gli strumenti", "type": "Finding", "description": "La config copiava shim e ident solo se una entry cambiava: con le entry a posto, l'installato restava vecchio mentre il sorgente andava avanti.", "resource": "../../tools/craft-bridge-config.py", "tags": ["difetto", "installazione", "deriva"], "degree": 8}, {"id": "findings/wrong-app-and-build.md", "title": "il meccanismo", "type": "Finding", "description": "Aprire il canale non basta: la porta puo' essere di un'altra app o di un'altra versione. L'identita' si prova col catalogo dei comandi, la versione col processo che ascolta.", "resource": "../../tools/craft-bridge-ident.py", "tags": ["difetto", "identita", "build"], "degree": 4}, {"id": "operations/diagnosis.md", "title": "La suite che prova gli strumenti", "type": "Runbook", "description": "I tre livelli di controllo - verdetto unico (doctor), entry reali (verify), guasti iniettati (tests) - e come leggere i report nel tempo.", "resource": "../../tools/craft-bridge-doctor.py", "tags": ["runbook", "diagnosi", "verifica", "report"], "degree": 11}, {"id": "operations/install-and-repair.md", "title": "Manuale tecnico completo", "type": "Runbook", "description": "Da zero a ponte funzionante, e come tornare indietro: installazione delle copie, entry dei connettori, avvio delle app, ripristino headless.", "resource": "../../tools/craft-bridge-config.py", "tags": ["runbook", "installazione", "ripristino"], "degree": 6}, {"id": "operations/safety-rules.md", "title": "La suite che prova gli strumenti", "type": "Policy", "description": "Le regole che valgono sempre: cosa non si modifica, quali file sono sacri, come si prova senza toccare la configurazione vera.", "resource": "../../README.md", "tags": ["policy", "sicurezza", "regole"], "degree": 6}, {"id": "overview.md", "title": "Analisi dell'ecosistema MCP", "type": "Project Overview", "description": "Il ponte che rende complete le Crafting Apps come server MCP: invece di ripiegare su una CLI senza interfaccia, l'app viva viene guidata nel suo canale di controllo.", "resource": "../../README.md", "tags": ["bridge", "mcp", "panoramica"], "degree": 5}, {"id": "reference/analisi.md", "title": "Analisi dell'ecosistema MCP ArtCraft", "type": "Reference", "description": "Inventario dei 13 server MCP configurati, ambiente di lavoro, decisioni prese e stato del ponte.", "resource": "../../docs/reference/analisi.md", "tags": ["analisi", "mcp", "inventario"], "degree": 9}, {"id": "reference/craft-bridge.md", "title": "Craft Bridge - manuale tecnico", "type": "Reference", "description": "Il canale di controllo delle Crafting Apps: protocollo, shim bridged/headless, identita' e build, comandi e prove.", "resource": "../../docs/reference/craft-bridge.md", "tags": ["bridge", "protocollo", "manuale"], "degree": 9}, {"id": "reference/piano.md", "title": "Piano di lavoro", "type": "Reference", "description": "Fasi, milestone e verifiche previste per il ponte.", "resource": "../../docs/reference/piano.md", "tags": ["piano", "milestone"], "degree": 5}, {"id": "reference/spec.md", "title": "Spec del progetto", "type": "Reference", "description": "Requisiti, vincoli e criteri di accettazione del ponte tra le Crafting Apps e i client MCP.", "resource": "../../docs/reference/spec.md", "tags": ["spec", "requisiti"], "degree": 5}, {"id": "tools/artcraft-mcp-proxy.md", "title": "Analisi dell'ecosistema MCP", "type": "Tool", "description": "Riespone i tool dell'MCP generativo ArtCraft con i nomi in camelCase attesi dai client, correggendo i nomi snake_case che alcuni client rifiutano.", "resource": "../../tools/artcraft-mcp-proxy.py", "tags": ["strumento", "conformita", "artcraft"], "degree": 2}, {"id": "tools/craft-bridge-config.md", "title": "installato contro sorgente", "type": "Tool", "description": "Installa le copie dello shim e di ident, riscrive le entry bridged nella config dei connettori con backup, e riallinea i file quando il sorgente cambia.", "resource": "../../tools/craft-bridge-config.py", "tags": ["strumento", "installazione", "config"], "degree": 11}, {"id": "tools/craft-bridge-doctor.md", "title": "La suite che prova gli strumenti", "type": "Tool", "description": "Controlla repo, copie installate, entry di config, eseguibili, credenziali e build in ascolto; in fondo elenca le azioni che risolvono i problemi trovati.", "resource": "../../tools/craft-bridge-doctor.py", "tags": ["strumento", "diagnosi", "verdetto"], "degree": 14}, {"id": "tools/craft-bridge-ident.md", "title": "Manuale tecnico completo", "type": "Tool", "description": "Risponde a due domande: chi ascolta su una porta (app riconosciuta dal catalogo dei comandi) e quale versione ci gira (PID, eseguibile, riga di avvio).", "resource": "../../tools/craft-bridge-ident.py", "tags": ["strumento", "identita", "build"], "degree": 10}, {"id": "tools/craft-bridge-launch.md", "title": "La suite che prova gli strumenti", "type": "Tool", "description": "Avvia una o piu' app staccate dalla shell, con --control sulla porta che la config si aspetta, aspetta i canali in parallelo e dice chi risponde (e con quale build).", "resource": "../../tools/craft-bridge-launch.py", "tags": ["strumento", "avvio", "launcher"], "degree": 9}, {"id": "tools/craft-bridge-mcp.md", "title": "la decisione bridged/headless", "type": "Tool", "description": "Il server MCP che Freebuff avvia: sceglie bridged o headless con l'handshake e inoltra le richieste all'app viva.", "resource": "../../tools/craft-bridge-mcp.py", "tags": ["strumento", "shim", "stdio"], "degree": 7}, {"id": "tools/craft-bridge-sweep.md", "title": "Manuale tecnico completo", "type": "Tool", "description": "Avvia una app alla volta e misura gli stessi tool nei due modi, per provare che il ponte aggiunge capacita' sulla finestra invece di sostituire la CLI.", "resource": "../../tools/craft-bridge-sweep.py", "tags": ["strumento", "misura", "confronto"], "degree": 6}, {"id": "tools/craft-bridge-tests.md", "title": "il formato del report", "type": "Tool", "description": "Dieci casi che rompono qualcosa di proposito e pretendono il verdetto giusto da doctor, ident e launcher; ogni esecuzione lascia un report con il confronto sulla precedente.", "resource": "../../tools/craft-bridge-tests.py", "tags": ["strumento", "test", "guasti", "report"], "degree": 20}, {"id": "tools/craft-bridge-verify.md", "title": "Manuale tecnico completo", "type": "Tool", "description": "Legge la config e interroga ogni entry eseguendo esattamente il comando scritto li' - shim compreso - e riferisce modo, tool disponibili ed esito di una chiamata.", "resource": "../../tools/craft-bridge-verify.py", "tags": ["strumento", "verifica", "entry"], "degree": 8}, {"id": "tools/exploration.md", "title": "Manuale tecnico completo", "type": "Tool", "description": "I tre strumenti con cui il ponte e' stato scoperto e poi dimostrato: recon legge i binari, probe interroga un server MCP qualsiasi, pilot guida l'app e salva gli artefatti.", "resource": "../../tools/craft-bridge-recon.py", "tags": ["strumento", "esplorazione", "recon", "probe", "pilot"], "degree": 4}, {"id": "tools/report-mcp-tools.md", "title": "Analisi dell'ecosistema MCP", "type": "Tool", "description": "Avvia ogni server MCP configurato, fa l'handshake e chiede tools/list: produce l'elenco reale dei tool disponibili, server per server.", "resource": "../../tools/report-mcp-tools.py", "tags": ["strumento", "inventario", "tool"], "degree": 3}], "links": [{"source": "architecture/control-channel.md", "target": "findings/auth-refused-crash.md"}, {"source": "architecture/control-channel.md", "target": "architecture/shim-modes.md"}, {"source": "architecture/control-channel.md", "target": "tools/craft-bridge-ident.md"}, {"source": "architecture/control-channel.md", "target": "tools/craft-bridge-tests.md"}, {"source": "architecture/identity.md", "target": "architecture/shim-modes.md"}, {"source": "architecture/identity.md", "target": "tools/craft-bridge-doctor.md"}, {"source": "architecture/identity.md", "target": "tools/craft-bridge-tests.md"}, {"source": "architecture/identity.md", "target": "tools/craft-bridge-launch.md"}, {"source": "architecture/installation-layout.md", "target": "findings/stale-installed-files.md"}, {"source": "architecture/installation-layout.md", "target": "tools/craft-bridge-config.md"}, {"source": "architecture/installation-layout.md", "target": "tools/craft-bridge-doctor.md"}, {"source": "architecture/installation-layout.md", "target": "operations/safety-rules.md"}, {"source": "architecture/installation-layout.md", "target": "operations/install-and-repair.md"}, {"source": "architecture/reports.md", "target": "tools/craft-bridge-tests.md"}, {"source": "architecture/reports.md", "target": "tools/craft-bridge-sweep.md"}, {"source": "architecture/reports.md", "target": "tools/report-mcp-tools.md"}, {"source": "architecture/shim-modes.md", "target": "findings/silent-fallback.md"}, {"source": "architecture/shim-modes.md", "target": "architecture/control-channel.md"}, {"source": "architecture/shim-modes.md", "target": "architecture/identity.md"}, {"source": "architecture/shim-modes.md", "target": "tools/craft-bridge-tests.md"}, {"source": "architecture/shim-modes.md", "target": "tools/craft-bridge-verify.md"}, {"source": "findings/auth-refused-crash.md", "target": "findings/stale-installed-files.md"}, {"source": "findings/auth-refused-crash.md", "target": "tools/craft-bridge-tests.md"}, {"source": "findings/auth-refused-crash.md", "target": "architecture/control-channel.md"}, {"source": "findings/auth-refused-crash.md", "target": "operations/safety-rules.md"}, {"source": "findings/silent-fallback.md", "target": "tools/craft-bridge-tests.md"}, {"source": "findings/silent-fallback.md", "target": "architecture/shim-modes.md"}, {"source": "findings/silent-fallback.md", "target": "tools/craft-bridge-ident.md"}, {"source": "findings/silent-fallback.md", "target": "reference/craft-bridge.md"}, {"source": "findings/stale-installed-files.md", "target": "tools/craft-bridge-tests.md"}, {"source": "findings/stale-installed-files.md", "target": "architecture/installation-layout.md"}, {"source": "findings/stale-installed-files.md", "target": "tools/craft-bridge-doctor.md"}, {"source": "findings/stale-installed-files.md", "target": "findings/auth-refused-crash.md"}, {"source": "findings/wrong-app-and-build.md", "target": "tools/craft-bridge-tests.md"}, {"source": "findings/wrong-app-and-build.md", "target": "architecture/identity.md"}, {"source": "findings/wrong-app-and-build.md", "target": "tools/craft-bridge-doctor.md"}, {"source": "findings/wrong-app-and-build.md", "target": "tools/craft-bridge-launch.md"}, {"source": "operations/diagnosis.md", "target": "architecture/reports.md"}, {"source": "operations/diagnosis.md", "target": "tools/craft-bridge-doctor.md"}, {"source": "operations/diagnosis.md", "target": "tools/craft-bridge-verify.md"}, {"source": "operations/diagnosis.md", "target": "tools/craft-bridge-tests.md"}, {"source": "operations/diagnosis.md", "target": "operations/safety-rules.md"}, {"source": "operations/diagnosis.md", "target": "findings/silent-fallback.md"}, {"source": "operations/install-and-repair.md", "target": "tools/craft-bridge-config.md"}, {"source": "operations/install-and-repair.md", "target": "tools/craft-bridge-launch.md"}, {"source": "operations/install-and-repair.md", "target": "architecture/installation-layout.md"}, {"source": "operations/install-and-repair.md", "target": "operations/diagnosis.md"}, {"source": "operations/safety-rules.md", "target": "architecture/installation-layout.md"}, {"source": "operations/safety-rules.md", "target": "tools/craft-bridge-tests.md"}, {"source": "operations/safety-rules.md", "target": "tools/craft-bridge-doctor.md"}, {"source": "overview.md", "target": "reference/craft-bridge.md"}, {"source": "overview.md", "target": "architecture/control-channel.md"}, {"source": "overview.md", "target": "operations/diagnosis.md"}, {"source": "overview.md", "target": "reference/analisi.md"}, {"source": "reference/analisi.md", "target": "reference/craft-bridge.md"}, {"source": "reference/analisi.md", "target": "reference/spec.md"}, {"source": "reference/analisi.md", "target": "reference/piano.md"}, {"source": "reference/craft-bridge.md", "target": "reference/analisi.md"}, {"source": "reference/craft-bridge.md", "target": "reference/spec.md"}, {"source": "reference/craft-bridge.md", "target": "reference/piano.md"}, {"source": "reference/piano.md", "target": "reference/analisi.md"}, {"source": "reference/piano.md", "target": "reference/spec.md"}, {"source": "reference/spec.md", "target": "reference/analisi.md"}, {"source": "reference/spec.md", "target": "reference/piano.md"}, {"source": "tools/artcraft-mcp-proxy.md", "target": "reference/analisi.md"}, {"source": "tools/artcraft-mcp-proxy.md", "target": "overview.md"}, {"source": "tools/craft-bridge-config.md", "target": "findings/stale-installed-files.md"}, {"source": "tools/craft-bridge-config.md", "target": "tools/craft-bridge-mcp.md"}, {"source": "tools/craft-bridge-config.md", "target": "tools/craft-bridge-ident.md"}, {"source": "tools/craft-bridge-config.md", "target": "architecture/installation-layout.md"}, {"source": "tools/craft-bridge-config.md", "target": "tools/craft-bridge-doctor.md"}, {"source": "tools/craft-bridge-config.md", "target": "tools/craft-bridge-tests.md"}, {"source": "tools/craft-bridge-doctor.md", "target": "tools/craft-bridge-ident.md"}, {"source": "tools/craft-bridge-doctor.md", "target": "tools/craft-bridge-config.md"}, {"source": "tools/craft-bridge-doctor.md", "target": "tools/craft-bridge-tests.md"}, {"source": "tools/craft-bridge-doctor.md", "target": "operations/diagnosis.md"}, {"source": "tools/craft-bridge-ident.md", "target": "architecture/identity.md"}, {"source": "tools/craft-bridge-ident.md", "target": "tools/craft-bridge-doctor.md"}, {"source": "tools/craft-bridge-ident.md", "target": "tools/craft-bridge-launch.md"}, {"source": "tools/craft-bridge-ident.md", "target": "tools/craft-bridge-tests.md"}, {"source": "tools/craft-bridge-launch.md", "target": "tools/craft-bridge-ident.md"}, {"source": "tools/craft-bridge-launch.md", "target": "tools/craft-bridge-config.md"}, {"source": "tools/craft-bridge-launch.md", "target": "reference/craft-bridge.md"}, {"source": "tools/craft-bridge-launch.md", "target": "operations/install-and-repair.md"}, {"source": "tools/craft-bridge-mcp.md", "target": "findings/auth-refused-crash.md"}, {"source": "tools/craft-bridge-mcp.md", "target": "architecture/shim-modes.md"}, {"source": "tools/craft-bridge-mcp.md", "target": "architecture/control-channel.md"}, {"source": "tools/craft-bridge-mcp.md", "target": "tools/craft-bridge-config.md"}, {"source": "tools/craft-bridge-mcp.md", "target": "tools/craft-bridge-verify.md"}, {"source": "tools/craft-bridge-sweep.md", "target": "architecture/shim-modes.md"}, {"source": "tools/craft-bridge-sweep.md", "target": "tools/craft-bridge-verify.md"}, {"source": "tools/craft-bridge-sweep.md", "target": "reference/craft-bridge.md"}, {"source": "tools/craft-bridge-tests.md", "target": "findings/auth-refused-crash.md"}, {"source": "tools/craft-bridge-tests.md", "target": "findings/stale-installed-files.md"}, {"source": "tools/craft-bridge-tests.md", "target": "tools/craft-bridge-doctor.md"}, {"source": "tools/craft-bridge-tests.md", "target": "tools/craft-bridge-ident.md"}, {"source": "tools/craft-bridge-tests.md", "target": "tools/craft-bridge-launch.md"}, {"source": "tools/craft-bridge-tests.md", "target": "architecture/reports.md"}, {"source": "tools/craft-bridge-tests.md", "target": "operations/diagnosis.md"}, {"source": "tools/craft-bridge-verify.md", "target": "tools/craft-bridge-mcp.md"}, {"source": "tools/craft-bridge-verify.md", "target": "tools/craft-bridge-doctor.md"}, {"source": "tools/craft-bridge-verify.md", "target": "tools/craft-bridge-sweep.md"}, {"source": "tools/craft-bridge-verify.md", "target": "operations/diagnosis.md"}, {"source": "tools/exploration.md", "target": "architecture/control-channel.md"}, {"source": "tools/exploration.md", "target": "architecture/shim-modes.md"}, {"source": "tools/exploration.md", "target": "architecture/reports.md"}, {"source": "tools/exploration.md", "target": "reference/craft-bridge.md"}, {"source": "tools/report-mcp-tools.md", "target": "reference/analisi.md"}, {"source": "tools/report-mcp-tools.md", "target": "tools/craft-bridge-sweep.md"}]}</script>
+<script>
+(function(){
+  const DATA = JSON.parse(document.getElementById('data').textContent);
+  const nodes = DATA.nodes, links = DATA.links;
+  const byId = Object.fromEntries(nodes.map(n=>[n.id,n]));
+  document.getElementById('stats').textContent =
+    nodes.length + ' concepts · ' + links.length + ' links · OKF ' + (DATA.okf_version||'0.1');
+
+  // Palette by type.
+  const PALETTE = ['#5b9dff','#57d9a3','#f4b740','#ff7a90','#b58cff','#4dd0e1','#ff9f6e','#9ccc65','#e07be0','#7986cb'];
+  const types = [...new Set(nodes.map(n=>n.type))].sort();
+  const colorOf = {}; types.forEach((t,i)=>colorOf[t]=PALETTE[i%PALETTE.length]);
+  const active = new Set(types);
+
+  // Layout state.
+  nodes.forEach(n=>{ n.x=(Math.random()-.5)*400; n.y=(Math.random()-.5)*400; n.vx=0; n.vy=0; });
+  const linkPairs = links.map(l=>[byId[l.source], byId[l.target]]).filter(p=>p[0]&&p[1]);
+
+  const cv = document.getElementById('cv'), ctx = cv.getContext('2d');
+  let W=0,H=0,DPR=Math.min(2,window.devicePixelRatio||1);
+  let scale=1, ox=0, oy=0, alpha=1;
+  function resize(){ const r=cv.getBoundingClientRect(); W=r.width; H=r.height;
+    cv.width=W*DPR; cv.height=H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0); ox=W/2; oy=H/2; }
+  window.addEventListener('resize', resize); resize();
+
+  function step(){
+    if(alpha<0.01) return;
+    const vis = nodes.filter(n=>active.has(n.type));
+    // repulsion (O(n^2) is fine for reference-sized bundles)
+    for(let i=0;i<vis.length;i++){ const a=vis[i];
+      for(let j=i+1;j<vis.length;j++){ const b=vis[j];
+        let dx=a.x-b.x, dy=a.y-b.y, d2=dx*dx+dy*dy+0.01; let f=1400/d2;
+        let d=Math.sqrt(d2); let fx=dx/d*f, fy=dy/d*f;
+        a.vx+=fx; a.vy+=fy; b.vx-=fx; b.vy-=fy; } }
+    // springs
+    for(const [a,b] of linkPairs){ if(!active.has(a.type)||!active.has(b.type)) continue;
+      let dx=b.x-a.x, dy=b.y-a.y, d=Math.sqrt(dx*dx+dy*dy)+.01; let f=(d-90)*0.02;
+      let fx=dx/d*f, fy=dy/d*f; a.vx+=fx; a.vy+=fy; b.vx-=fx; b.vy-=fy; }
+    // gravity to center + integrate
+    for(const n of vis){ n.vx += -n.x*0.002; n.vy += -n.y*0.002;
+      n.vx*=0.85; n.vy*=0.85; n.x+=n.vx*alpha; n.y+=n.vy*alpha; }
+    alpha*=0.994;
+  }
+
+  let hover=null, sel=null, query='';
+  function matches(n){ if(!query) return true; const q=query.toLowerCase();
+    return (n.title||'').toLowerCase().includes(q) || (n.description||'').toLowerCase().includes(q)
+      || (n.type||'').toLowerCase().includes(q) || (n.tags||[]).join(' ').toLowerCase().includes(q); }
+  function radius(n){ return 4 + Math.min(10, Math.sqrt(n.degree||0)*2.2); }
+  function sx(n){ return ox + n.x*scale; } function sy(n){ return oy + n.y*scale; }
+
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    ctx.lineWidth=1;
+    for(const [a,b] of linkPairs){ if(!active.has(a.type)||!active.has(b.type)) continue;
+      const dim = query && !(matches(a)&&matches(b));
+      ctx.strokeStyle = dim ? 'rgba(120,140,180,.06)' : 'rgba(120,140,180,.22)';
+      ctx.beginPath(); ctx.moveTo(sx(a),sy(a)); ctx.lineTo(sx(b),sy(b)); ctx.stroke(); }
+    for(const n of nodes){ if(!active.has(n.type)) continue;
+      const r=radius(n), on=matches(n);
+      ctx.globalAlpha = on?1:0.15;
+      ctx.beginPath(); ctx.arc(sx(n),sy(n),r,0,7); ctx.fillStyle=colorOf[n.type]; ctx.fill();
+      if(n===sel||n===hover){ ctx.lineWidth=2; ctx.strokeStyle='#fff'; ctx.stroke(); ctx.lineWidth=1; }
+      if((scale>0.8 && on && (n.degree>1)) || n===sel || n===hover){
+        ctx.globalAlpha = on?0.9:0.2; ctx.fillStyle='#e6ebf5'; ctx.font='11px sans-serif';
+        ctx.fillText(n.title.slice(0,28), sx(n)+r+3, sy(n)+3); }
+    }
+    ctx.globalAlpha=1;
+    document.getElementById('empty').style.display = nodes.some(n=>active.has(n.type)&&matches(n))?'none':'flex';
+  }
+  function frame(){ step(); draw(); requestAnimationFrame(frame); } frame();
+  function reheat(){ alpha=Math.max(alpha,0.6); }
+
+  // Interaction
+  function nodeAt(px,py){ let best=null,bd=1e9;
+    for(const n of nodes){ if(!active.has(n.type)) continue; const dx=px-sx(n),dy=py-sy(n),d=dx*dx+dy*dy;
+      const r=radius(n)+4; if(d<r*r && d<bd){ bd=d; best=n; } } return best; }
+  let dragging=false,dragNode=null,lastX,lastY,moved=false;
+  cv.addEventListener('mousedown',e=>{ const n=nodeAt(e.offsetX,e.offsetY); moved=false;
+    if(n){ dragNode=n; } else { dragging=true; } lastX=e.offsetX; lastY=e.offsetY; });
+  window.addEventListener('mousemove',e=>{ const r=cv.getBoundingClientRect();
+    const px=e.clientX-r.left, py=e.clientY-r.top;
+    if(dragNode){ dragNode.x=(px-ox)/scale; dragNode.y=(py-oy)/scale; dragNode.vx=dragNode.vy=0; reheat(); moved=true; }
+    else if(dragging){ ox+=px-lastX; oy+=py-lastY; lastX=px; lastY=py; moved=true; }
+    else { hover=nodeAt(px,py); cv.style.cursor=hover?'pointer':'default'; } });
+  window.addEventListener('mouseup',e=>{ if(dragNode&&!moved) select(dragNode); dragNode=null; dragging=false; });
+  cv.addEventListener('click',e=>{ if(moved) return; const n=nodeAt(e.offsetX,e.offsetY); select(n); });
+  cv.addEventListener('wheel',e=>{ e.preventDefault(); const f=e.deltaY<0?1.1:0.9;
+    const mx=e.offsetX,my=e.offsetY; ox=mx-(mx-ox)*f; oy=my-(my-oy)*f; scale*=f; },{passive:false});
+
+  function select(n){ sel=n; const d=document.getElementById('detail'); if(!n){ return; }
+    const outs = linkPairs.filter(p=>p[0]===n).map(p=>p[1]);
+    const ins = linkPairs.filter(p=>p[1]===n).map(p=>p[0]);
+    const li = arr => arr.length? '<ul>'+arr.map(t=>`<li><a data-id="${enc(t.id)}">${esc(t.title)}</a></li>`).join('')+'</ul>' : '<div style="color:var(--muted)">none</div>';
+    d.innerHTML = `<span class="t">${esc(n.type)}</span><h2>${esc(n.title)}</h2>`
+      + `<div>${esc(n.description||'')}</div>`
+      + (n.resource? `<div style="margin:8px 0"><a href="${esc(n.resource)}" target="_blank" rel="noopener">${esc(n.resource)}</a></div>`:'')
+      + (n.tags&&n.tags.length? `<div class="tags">${n.tags.map(t=>`<span>${esc(t)}</span>`).join('')}</div>`:'')
+      + `<div style="margin-top:8px"><b>Links to</b> ${li(outs)}</div>`
+      + `<div><b>Referenced by</b> ${li(ins)}</div>`
+      + `<div style="margin-top:8px;color:var(--muted);font-size:12px">${esc(n.id)}</div>`;
+    d.querySelectorAll('a[data-id]').forEach(a=>a.onclick=()=>{ const t=byId[a.getAttribute('data-id')]; if(t){ select(t); focusNode(t);} });
+    reheat();
+  }
+  function focusNode(n){ ox=W/2 - n.x*scale; oy=H/2 - n.y*scale; }
+  function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+  function enc(s){ return esc(s); }
+
+  // Search + legend
+  document.getElementById('q').addEventListener('input',e=>{ query=e.target.value.trim(); });
+  const legend=document.getElementById('legend');
+  const counts={}; nodes.forEach(n=>counts[n.type]=(counts[n.type]||0)+1);
+  legend.innerHTML = types.map(t=>`<label><input type="checkbox" checked data-type="${esc(t)}">`
+    + `<span class="swatch" style="background:${colorOf[t]}"></span>${esc(t)}<span class="count">${counts[t]}</span></label>`).join('');
+  legend.querySelectorAll('input').forEach(cb=>cb.onchange=()=>{ const t=cb.getAttribute('data-type');
+    cb.checked?active.add(t):active.delete(t); reheat(); });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,100 @@
+{
+  "when": "2026-10-13T16:29:19",
+  "host": "wkai01",
+  "python": "3.12.10",
+  "modes": {
+    "static": false,
+    "only": null
+  },
+  "tools": {
+    "craft-bridge-mcp.py": "3f4bf8aa1ad4",
+    "craft-bridge-ident.py": "8df181789548",
+    "craft-bridge-doctor.py": "e16e1ab9f82a",
+    "craft-bridge-config.py": "7776f22be252",
+    "craft-bridge-tests.py": "2084a9f8a81c"
+  },
+  "cases": [
+    {
+      "case": "stato pulito",
+      "kind": "static",
+      "state": "PASS",
+      "detail": "doctor: nessuna azione",
+      "seconds": 1.3
+    },
+    {
+      "case": "shim installato stantio",
+      "kind": "static",
+      "state": "PASS",
+      "detail": "accusato e riparato dall'azione indicata",
+      "seconds": 2.0
+    },
+    {
+      "case": "entry di config sbagliata",
+      "kind": "static",
+      "state": "PASS",
+      "detail": "doctor e installer concordano: 1 entry da aggiornare",
+      "seconds": 1.1
+    },
+    {
+      "case": "percorso inesistente",
+      "kind": "static",
+      "state": "PASS",
+      "detail": "FIX percorsi: cadcraft.command",
+      "seconds": 0.8
+    },
+    {
+      "case": "eseguibile mancante",
+      "kind": "unit",
+      "state": "PASS",
+      "detail": "lightcraft app, lightcraft cli",
+      "seconds": 0.2
+    },
+    {
+      "case": "porta chiusa",
+      "kind": "live",
+      "state": "PASS",
+      "detail": "ident unreachable, shim headless (porta 7979)",
+      "seconds": 5.1
+    },
+    {
+      "case": "app giusta sulla porta",
+      "kind": "e2e",
+      "state": "PASS",
+      "detail": "gridcraft 7975: ident/doctor/launcher tutti d'accordo",
+      "seconds": 9.1
+    },
+    {
+      "case": "build diversa",
+      "kind": "e2e",
+      "state": "PASS",
+      "detail": "doctor, ident e launcher: tutti e tre exit 1 con 0.5.0 != 0.6.1",
+      "seconds": 10.3
+    },
+    {
+      "case": "altra app sulla porta",
+      "kind": "e2e",
+      "state": "PASS",
+      "detail": "GridCraft su 7972: doctor e ident lo riconoscono",
+      "seconds": 7.5
+    },
+    {
+      "case": "credenziale rifiutata",
+      "kind": "e2e",
+      "state": "PASS",
+      "detail": "token diverso: accusato da doctor e ident (valore mai stampato)",
+      "seconds": 6.0
+    }
+  ],
+  "passed": 10,
+  "failed": 0,
+  "skipped": 0,
+  "ok": true,
+  "seconds": 44.4,
+  "compared_with": "2026-10-13T16:28:34",
+  "previous_seconds": 44.4,
+  "changes": [],
+  "report_files": {
+    "json": "C:\\Users\\auresystem\\repos\\artcraft-mcp-bridge\\reports\\craft-bridge-tests.json",
+    "markdown": "C:\\Users\\auresystem\\repos\\artcraft-mcp-bridge\\reports\\craft-bridge-tests.md"
+  }
+}
