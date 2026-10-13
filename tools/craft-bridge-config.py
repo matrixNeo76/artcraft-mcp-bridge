@@ -76,8 +76,16 @@ def bridge_table(source: str | None = None) -> dict:
     canale su porta nota; ma il ponte le serve, quindi chi confronta la build
     installata con quella pubblicata le deve guardare anche loro. Il percorso della CLI
     lo risolve il traduttore, la stessa fonte della sua entry (una sola risoluzione).
+
+    Con `source` (una tabella di prova, come `--apps-file`) le app tradotte **non** si
+    aggiungono: una tabella iniettata e' tutto il mondo che quel giro deve vedere. Se si
+    mescolasse con le app vere della macchina, lo stesso caso darebbe un esito qui e un
+    altro su un runner senza app - ed e' successo: la riga `flag di aggancio` leggeva
+    anche il `pdfcraft` della macchina e il verdetto cambiava da `ok` a `nota`.
     """
     table = dict(apps_table(source))
+    if source:
+        return table
     for slug in TRANSLATED:
         if slug in table:
             continue

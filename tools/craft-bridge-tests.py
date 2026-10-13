@@ -564,7 +564,17 @@ def t_ui_args(run: Runner) -> tuple[str, str]:
 
 @case("sessione del traduttore", "unit")
 def t_ui_session(run: Runner) -> tuple[str, str]:
-    """Una sessione MCP vera contro un finto PdfCraft: 15 tool, e ogni chiamata un processo."""
+    """Una sessione MCP vera contro un finto PdfCraft: 15 tool, e ogni chiamata un processo.
+
+    La finestra e' finta, la CLI no: la catena che si prova e' traduttore -> `pdfcraft-cli
+    ui --control FILE` -> canale, e a parlare col canale deve essere la CLI del fornitore.
+    Dove non c'e' (un runner di CI senza le app) il caso si **salta motivando**, invece di
+    morire con `server MCP chiuso in anticipo` che non dice niente a nessuno.
+    """
+    cli, source = UI.resolve_cli("pdfcraft", None)
+    if not Path(cli).is_file():
+        return "SKIP", (f"la CLI del fornitore non e' installata ({cli}, {source}): "
+                        "senza di lei la catena bridged non si puo' provare")
     fake = FakeWindow()
     control = fake.control_file(run.tmp / "control.json")
     client = None

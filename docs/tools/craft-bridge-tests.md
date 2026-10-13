@@ -35,12 +35,20 @@ every check that talks to the CLIs or to the translator costs a process): that i
 suite asks the doctor **only** what a single line cannot say.
 
 Four cases concern [the window translator](craft-bridge-ui.md) and three of them **need no
-app**: a fake PdfCraft answers on the channel the way the real app does (authentication
+window**: a fake PdfCraft answers on the channel the way the real app does (authentication
 with the control file's token, `ui.state`, a fake screenshot, a real fault on a label that
 does not exist), and it is **shut down mid-session** to demand the diagnosis instead of an
 answer that merely looks successful; a fake MCP server plays the part of the vendor's
 headless server. The fourth is the live one: if the window is not there it is **skipped
 with a reason**, because that is not a fault of the bridge.
+
+No window does not mean no CLI: in the session case the chain under test is the translator →
+`pdfcraft-cli ui --control FILE` → channel, so **the vendor's CLI is what must speak to the
+channel** and the case needs it installed. Where it is missing (a CI runner with no apps) the
+case is **skipped with the reason** (`la CLI del fornitore non e' installata (...)`), which is
+what the first real CI run of the translator found: it used to die with `server MCP chiuso in
+anticipo`, an error that says nothing about what was missing. The fallback case is the one that
+really needs nothing, because there the fake CLI **is** the headless server.
 
 # Interface
 

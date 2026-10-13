@@ -73,6 +73,15 @@ python tools/craft-bridge-doctor.py --feed-dir <folder>   # test launcher feed
 python tools/craft-bridge-doctor.py --apps-file table.json  # test table (diagnosis)
 ```
 
+# Test tables are the whole world
+
+With `--apps-file` the injected table **is everything that run sees**: the checks that read
+the table (flags, published release, paths) look only at it, and the translator's apps are not
+added on top. Mixing them would make the same case give one verdict here and another on a
+machine without apps - and it happened: the `flag di aggancio` line also read the machine's
+`pdfcraft`, so on a bare CI runner it came out as `nota` where the injected table had every
+right to be `ok`.
+
 # Exit codes
 
 | Exit | Meaning |
