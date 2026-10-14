@@ -761,8 +761,8 @@ been started by the bridge.
    23 passati, 0 falliti, 0 saltati
    ```
 
-   `--static` runs only the cases that start no app (20 of 24, ~34 s); the full suite **starts
-   real apps on free ports** and takes ~72 s. The cost grew with that of the tools that talk to
+   `--static` runs only the cases that start no app (25 of 29, ~80 s); the full suite **starts
+   real apps on free ports** and takes ~160 s. The cost grew with that of the tools that talk to
    the CLIs (every `doctor` asks the help of thirteen CLIs and queries the translator): that is
    why the suite asks the doctor only what a single line cannot say. The safety rules are in the
    docstring and always hold: the real config is never written (the cases exercise it on a copy

@@ -116,10 +116,14 @@ right to be `ok`.
 
 # Cost
 
-~2.7 s with the apps closed: ~0.8 s for the thirteen CLI helps (one per app served by the
-bridge, the most expensive part), and the rest for the comparison with the feed and the
-executable versions, which are read once and used by two checks. A few seconds more with
-apps open (one catalogue read per occupied port).
+~6 s with the apps closed (measured three times in a row: 6.1-6.2 s), and the thirteen CLI
+helps are most of it -- with `--apps-file` the helps are not asked and the rest falls under
+a second (0.3 s). So the cost of this diagnosis is the cost of asking thirteen programs what
+they accept; the comparison with the feed and the executable versions is read once and used
+by two checks. A few seconds more with apps open (one catalogue read per occupied port).
+
+That same ~6 s is also why the suite got slower: it runs `doctor` several times, and every
+run pays for the thirteen helps.
 
 # Relations
 

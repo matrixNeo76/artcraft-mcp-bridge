@@ -44,11 +44,11 @@ Every tool declares what it proved, and when it does not know it says so.
 python -m py_compile tools/*.py              # syntax of every tool
 python tools/craft-bridge-doctor.py          # one verdict on the assembly (exit 0 = nothing to do)
 python tools/craft-bridge-mcp.py --flags     # the attach flag every CLI declares
-python tools/craft-bridge-tests.py --static  # ~34 s, the cases that start no app (20 of 24)
+python tools/craft-bridge-tests.py --static  # ~80 s, the cases that start no app (25 of 29)
 python tools/craft-bridge-feed.py            # installed against published (if the launcher is there)
 python tools/craft-bridge-connect.py --list  # which MCP clients are here (writes nothing)
 python tools/craft-bridge-report.py          # the whole state in reports/bridge-status.{json,html}
-python tools/craft-bridge-tests.py           # ~72 s, including the cases with real apps
+python tools/craft-bridge-tests.py           # ~160 s, including the cases with real apps
 ```
 
 CI runs `python tools/craft-bridge-tests.py --static --ci`: `--ci` skips the cases that
