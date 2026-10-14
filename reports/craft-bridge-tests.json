@@ -1,5 +1,5 @@
 {
-  "when": "2026-10-13T22:00:38",
+  "when": "2026-10-14T10:07:10",
   "host": "wkai01",
   "python": "3.12.10",
   "modes": {
@@ -8,13 +8,15 @@
     "ci": false
   },
   "tools": {
-    "craft-bridge-mcp.py": "e63385cf6422",
+    "craft-bridge-mcp.py": "f52a99d7261f",
     "craft-bridge-ident.py": "8df181789548",
-    "craft-bridge-doctor.py": "095fb4828ac5",
+    "craft-bridge-doctor.py": "41414d417fbf",
     "craft-bridge-config.py": "236ff781b8ee",
     "craft-bridge-feed.py": "c65b3ac8ee1a",
-    "craft-bridge-tests.py": "92b472ab9bfa",
-    "craft-bridge-ui.py": "bed1af7f410d"
+    "craft-bridge-tests.py": "96aed04d9920",
+    "craft-bridge-ui.py": "ed3cab22827d",
+    "craft-bridge-connect.py": "b8fccd17a9d0",
+    "craft-bridge-report.py": "0957d425a9f8"
   },
   "cases": [
     {
@@ -22,28 +24,28 @@
       "kind": "static",
       "state": "PASS",
       "detail": "doctor: nessuna azione",
-      "seconds": 2.8
+      "seconds": 6.2
     },
     {
       "case": "shim installato stantio",
       "kind": "static",
       "state": "PASS",
       "detail": "accusato e riparato dall'azione indicata",
-      "seconds": 5.9
+      "seconds": 12.6
     },
     {
       "case": "entry di config sbagliata",
       "kind": "static",
       "state": "PASS",
       "detail": "doctor e installer concordano: 1 entry da aggiornare",
-      "seconds": 3.1
+      "seconds": 6.5
     },
     {
       "case": "percorso inesistente",
       "kind": "static",
       "state": "PASS",
       "detail": "FIX percorsi: cadcraft.command",
-      "seconds": 2.7
+      "seconds": 6.1
     },
     {
       "case": "eseguibile mancante",
@@ -63,7 +65,7 @@
       "case": "app registrate dal sistema",
       "kind": "static",
       "state": "PASS",
-      "detail": "11/11 percorsi dal registro App Paths, hive utente e macchina, tabella confermata, avvio sull'eseguibile registrato",
+      "detail": "12/12 percorsi dal registro App Paths, hive utente e macchina, tabella confermata, avvio sull'eseguibile registrato",
       "seconds": 0.0
     },
     {
@@ -92,7 +94,7 @@
       "kind": "static",
       "state": "PASS",
       "detail": "assente 3, illeggibile 3, estraneo 0 (nessun guasto inventato)",
-      "seconds": 2.5
+      "seconds": 4.2
     },
     {
       "case": "cancello sulle regressioni",
@@ -106,35 +108,35 @@
       "kind": "live",
       "state": "PASS",
       "detail": "ident unreachable, shim headless (porta 7979)",
-      "seconds": 5.2
+      "seconds": 6.7
     },
     {
       "case": "app giusta sulla porta",
       "kind": "e2e",
       "state": "PASS",
       "detail": "gridcraft 7975: ident/doctor/launcher tutti d'accordo",
-      "seconds": 10.7
+      "seconds": 22.0
     },
     {
       "case": "build diversa",
       "kind": "e2e",
       "state": "PASS",
       "detail": "doctor, ident e launcher: tutti e tre exit 1 con 0.5.0 != 0.6.1",
-      "seconds": 12.0
+      "seconds": 23.1
     },
     {
       "case": "altra app sulla porta",
       "kind": "e2e",
       "state": "PASS",
       "detail": "GridCraft su 7972: doctor e ident lo riconoscono",
-      "seconds": 9.1
+      "seconds": 17.1
     },
     {
       "case": "credenziale rifiutata",
       "kind": "e2e",
       "state": "PASS",
       "detail": "token diverso: accusato da doctor e ident (valore mai stampato)",
-      "seconds": 7.5
+      "seconds": 15.6
     },
     {
       "case": "argomenti della chiamata",
@@ -155,13 +157,13 @@
       "kind": "unit",
       "state": "PASS",
       "detail": "nessuna finestra: il server headless del fornitore passa attraverso, dichiarato",
-      "seconds": 0.5
+      "seconds": 0.6
     },
     {
       "case": "finestra PdfCraft dal vivo",
       "kind": "static",
       "state": "SKIP",
-      "detail": "finestra chiusa (nessuno in ascolto sulla porta 48129 (file stantio?)): l'entry va headless",
+      "detail": "finestra chiusa (nessuno in ascolto sulla porta 4497 (file stantio?)): l'entry va headless",
       "seconds": 0.8
     },
     {
@@ -176,24 +178,54 @@
       "kind": "unit",
       "state": "PASS",
       "detail": "tabella non confermata -> FIX con l'azione; confermata dal canale -> ok; CLI assente -> nota",
-      "seconds": 5.0
+      "seconds": 10.6
     },
     {
       "case": "flag di aggancio dal vivo",
       "kind": "static",
       "state": "PASS",
-      "detail": "11/11 CLI documentano il flag della tabella, e la diagnosi lo ripete",
-      "seconds": 3.1
+      "detail": "12/12 CLI documentano il flag della tabella, e la diagnosi lo ripete",
+      "seconds": 6.5
+    },
+    {
+      "case": "client MCP multipli",
+      "kind": "static",
+      "state": "PASS",
+      "detail": "JSON, VS Code, TOML e YAML: scritti, idempotenti, restore pulito",
+      "seconds": 1.5
+    },
+    {
+      "case": "report di stato",
+      "kind": "static",
+      "state": "PASS",
+      "detail": "json 14 entry, html 21522 byte",
+      "seconds": 0.4
+    },
+    {
+      "case": "report --serve",
+      "kind": "static",
+      "state": "PASS",
+      "detail": "servito su 127.0.0.1:4639: pagina 200 e JSON con lo schema",
+      "seconds": 1.4
+    },
+    {
+      "case": "client MCP nella diagnosi",
+      "kind": "static",
+      "state": "PASS",
+      "detail": "accusa cursor 0/13 (1) e tace con le 13 (0)",
+      "seconds": 12.4
     }
   ],
-  "passed": 23,
+  "passed": 27,
   "failed": 0,
   "skipped": 1,
   "ok": true,
-  "seconds": 76.4,
-  "compared_with": "2026-10-13T21:59:21",
-  "previous_seconds": 76.2,
-  "changes": [],
+  "seconds": 159.3,
+  "compared_with": "2026-10-14T09:59:16",
+  "previous_seconds": 158.8,
+  "changes": [
+    "`craft-bridge-tests.py`: fde5fea4ce26 -> 96aed04d9920"
+  ],
   "regressions": [],
   "gate": {
     "applied": true,

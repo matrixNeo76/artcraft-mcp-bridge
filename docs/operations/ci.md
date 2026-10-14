@@ -4,7 +4,7 @@ title: "Continuous integration: what every push checks"
 description: "The .github/workflows/checks.yml workflow: portable checks on a hosted runner, the full suite on a self-hosted runner, and what --ci means."
 resource: "../../.github/workflows/checks.yml"
 tags: [ci, workflow, checks, badge]
-generated: { by: process:freebuff-buffy, at: 2026-10-13T14:47:19Z }
+generated: { by: process:freebuff-buffy, at: 2026-10-14T08:15:00Z }
 status: stable
 sources:
 - resource: "../../.github/workflows/checks.yml"
@@ -170,6 +170,8 @@ alone, or the runner alone, changes nothing.
 | Diagnosis | `craft-bridge-doctor.py`; a non-zero exit fails the job with the actions it listed |
 | Full suite | `craft-bridge-tests.py` **without** `--ci`: here the absent-environment skips are not forgiven, and the gate on regressions applies - a case that gets worse than the committed baseline exits 3 and the job fails |
 | Artifact | `craft-bridge-tests-selfhosted` (the hosted job's is `craft-bridge-tests`: two different names, so the two runs do not overwrite each other) |
+| Status page | `craft-bridge-report.py` (live diagnosis) | the page of the machine where the bridge exists: verdict, entries, clients, baselines |
+| Status artifact | `bridge-status-selfhosted` (the hosted job's is `bridge-status`) | same rule as the report: two names, so the two runs do not overwrite each other |
 
 The steps use `powershell`, not `pwsh` - see above.
 
@@ -200,11 +202,43 @@ baseline` and the offending case named in the log, while the hosted job stayed g
 |---|---|---|
 | Syntax | `py_compile` on every tool | a syntax error must not reach an agent that invokes them |
 | Interfaces | `--help` of every tool with `argparse` | the interface exists and answers (stdio servers are skipped: a `--help` would start them waiting for stdin) |
-| App table | the 11 documented apps and ports | the table is a single source: config and diagnosis read this one |
-| Deterministic installer | two rounds of `--json` identical, and the entries are the shim's 11 plus the translator's one | idempotence, and the number is asked of the table instead of being written here: the fixed count went stale the first time an app changed road (expected 11, produced 12) |
+| App table | the 12 documented apps and ports | the table is a single source: config and diagnosis read this one |
+| Deterministic installer | two rounds of `--json` identical, and the entries are the shim's 12 plus the translator's one | idempotence, and the number is asked of the table instead of being written here: the fixed count went stale the first time an app changed road (expected 11, produced 12) |
 | OKF bundle | `uvx --from "okfgen==0.1.3" okfgen validate docs --strict` | the documentation stays consumable by another tool; the version is pinned so it does not depend on the newest release |
 | Suite | `craft-bridge-tests.py --static --ci` | the cases runnable without the bridge, with motivated skips. The gate on regressions does **not** apply here: a `--static --ci` run has its own baseline name (`craft-bridge-tests.static.ci.json`), which inside a fresh checkout does not exist yet |
 | Artifact | `reports/craft-bridge-tests.*` | the run report stays downloadable, even if the run fails |
+| Status page | `craft-bridge-report.py --no-live` | refreshes `reports/bridge-status.*` even with no apps, and even if the suite died before its own refresh |
+| Status artifact | `bridge-status` | the page stays downloadable on every push |
+
+# The status page travels with the run
+
+Both jobs end with the same pair of steps: one **regenerates** `reports/bridge-status.json` and
+`reports/bridge-status.html` - the same page `craft-bridge-report.py --serve` shows locally - and
+one **publishes** them as artifacts (`bridge-status` from the hosted job,
+`bridge-status-selfhosted` from the other). Every push therefore leaves a downloadable view of the
+state, with nobody having to regenerate it by hand.
+
+Three deliberate choices:
+
+* the hosted step runs with `--no-live`: on a runner without the apps there is no port to ask, and
+a probe would only add waiting to a page that is already honest about what it cannot see;
+* the step is `continue-on-error: true` and runs `if: always()`. A page that cannot be written is
+not a fault of the bridge - the verdict already says what is wrong - so the artifact is a
+commodity here, not a gate;
+* the suite refreshes the page itself at the end of a run (`--no-status` turns that off), so this
+step looks redundant - it is there for the run where the suite dies before reaching its own
+refresh, which is exactly the run whose page one would want to read.
+
+Downloading it:
+
+```bash
+gh run download --name bridge-status && start bridge-status/bridge-status.html
+gh run download --name bridge-status-selfhosted   # the run that used the self-hosted job
+```
+
+The file to open is `bridge-status.html`, with `bridge-status.json` beside it: opened straight from
+the downloaded folder it still renders, because the page carries a copy of the data inside for the
+`file://` case.
 
 # What `--ci` means
 
@@ -214,10 +248,11 @@ what an *absent environment* is, not what a *fault* is.
 
 The distinction is proved in three ways, all run before publishing it:
 
-1. on a machine with the bridge, `--static --ci` gives **19/19 and no skips** (23/23 on the
-   whole suite);
+1. on a machine with the bridge, `--static --ci` gives **20/20 and no skips** (24/24 on the
+   whole suite); with the PdfCraft window closed, the one live case of that mode skips and
+   says why - it is the case that needs the window, not a fault;
 2. on a machine without a bridge (an empty environment: no connector config, no installed
-   copies), it gives **11 passed + 8 skipped** and exits 0, with the reason on every skip;
+   copies), it gives **12 passed + 8 skipped** and exits 0, with the reason on every skip;
 3. with a real fault injected - one extra byte in the installed copy of the translator -
    the same command gives **FAIL** and exits 1 even with `--ci`: the mode does not hide
    faults, it only stops calling the absence of a bridge a fault.
@@ -242,6 +277,7 @@ The three things this found:
 
 - **it runs** [craft-bridge-tests](../tools/craft-bridge-tests.md) in `--ci` mode
 - **it runs** [craft-bridge-doctor](../tools/craft-bridge-doctor.md) in the self-hosted job
+- **it publishes** [craft-bridge-report](../tools/craft-bridge-report.md) as the run's status artifact
 - **it validates** [Reports and baseline](../architecture/reports.md) as the run artifact
 - **badge in** [README](../../README.md)
 - **safety rules in** [Safety rules](safety-rules.md)

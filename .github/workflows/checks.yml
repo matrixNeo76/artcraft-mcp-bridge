@@ -9,6 +9,10 @@ name: checks
 # vero (doctor pulito, shim installato, app su una porta) su un runner non hanno
 # niente da verificare: con `--ci` vengono saltati spiegando perche', e un guasto
 # vero resta un FAIL. Il report della suite finisce fra gli artefatti della run.
+#
+# Ogni run pubblica anche la **pagina di stato** (`reports/bridge-status.html` col suo
+# `.json`): la stessa che si guarda in locale con `craft-bridge-report.py --serve`,
+# cosi' un push lascia una vista scaricabile senza doverla rigenerare a mano.
 
 on:
   push:
@@ -67,10 +71,13 @@ jobs:
         run: |
           $table = python tools/craft-bridge-mcp.py --dump-apps | ConvertFrom-Json
           if ($LASTEXITCODE -ne 0) { throw "--dump-apps e' fallito" }
+          # Le porte **documentate** in docs/architecture/control-channel.md: questo step
+          # le confronta con la tabella, quindi una app nuova va aggiunta in tutti e due
+          # i posti (qui e nel nodo). `figcraft` e' l'ultima arrivata.
           $expected = [ordered]@{ cadcraft = 7971; deckcraft = 7972; designcraft = 7973
-                                 filmcraft = 7974; gridcraft = 7975; photocraft = 7976
-                                 soundcraft = 7977; wordcraft = 7978; vectorcraft = 7979
-                                 lightcraft = 7980; effectcraft = 9877 }
+                                 effectcraft = 9877; figcraft = 7981; filmcraft = 7974
+                                 gridcraft = 7975; lightcraft = 7980; photocraft = 7976
+                                 soundcraft = 7977; vectorcraft = 7979; wordcraft = 7978 }
           $count = ($table.PSObject.Properties | Measure-Object).Count
           if ($count -ne $expected.Count) { throw "app nella tabella: $count, attese $($expected.Count)" }
           foreach ($slug in $expected.Keys) {
@@ -144,6 +151,24 @@ jobs:
           path: reports/craft-bridge-tests.*
           if-no-files-found: warn
 
+      # La suite rigenera gia' la pagina a fine esecuzione; lo step la rifa' comunque,
+      # cosi' c'e' anche se la suite e' morta prima di arrivarci. `--no-live` perche' su
+      # un runner senza app non c'e' nessuna porta da interrogare. Non fallisce il job:
+      # un artefatto in meno non e' un guasto del ponte, e il verdetto lo dice gia' doctor.
+      - name: Pagina di stato
+        if: always()
+        continue-on-error: true
+        shell: pwsh
+        run: python tools/craft-bridge-report.py --no-live
+
+      - name: Pagina di stato (artefatto)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bridge-status
+          path: reports/bridge-status.*
+          if-no-files-found: warn
+
   ponte-completo:
     # La suite intera ha senso solo dove il ponte esiste: un runner self-hosted con
     # le Crafting Apps installate. Si attiva con la variabile di repository
@@ -193,4 +218,19 @@ jobs:
         with:
           name: craft-bridge-tests-selfhosted
           path: reports/craft-bridge-tests.*
+          if-no-files-found: warn
+
+      # Qui la pagina e' quella vera: macchina col ponte installato, finestre comprese.
+      - name: Pagina di stato
+        if: always()
+        continue-on-error: true
+        shell: powershell
+        run: python tools/craft-bridge-report.py
+
+      - name: Pagina di stato (artefatto)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bridge-status-selfhosted
+          path: reports/bridge-status.*
           if-no-files-found: warn

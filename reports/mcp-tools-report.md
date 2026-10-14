@@ -1,8 +1,8 @@
 # Report dei tool MCP disponibili
 
-**Generato:** 13/10/2026 19:06
+**Generato:** 13/10/2026 23:01
 **Configurazione:** `C:\Users\auresystem\.agents\mcp.json` (la stessa del pannello **Connectors** di Freebuff)
-**Server configurati:** 13 · **connessi:** 13 · **tool totali esposti:** 618
+**Server configurati:** 14 · **connessi:** 14 · **tool totali esposti:** 636
 
 ## Riepilogo
 
@@ -13,6 +13,7 @@
 | `deckcraft` | stdio | connesso | 2025-03-26 | 25 |
 | `designcraft` | stdio | connesso | 2025-03-26 | 25 |
 | `effectcraft` | stdio | connesso | 2025-03-26 | 27 |
+| `figcraft` | stdio | connesso | 2025-03-26 | 18 |
 | `filmcraft` | stdio | connesso | 2025-03-26 | 17 |
 | `gridcraft` | stdio | connesso | 2025-03-26 | 21 |
 | `lightcraft` | stdio | connesso | 2025-03-26 | 326 |
@@ -197,6 +198,29 @@
 - `render_preview`
 - `command_batch`
 - `doc_inspect`
+
+### `figcraft` (18 tool)
+
+`C:\Users\auresystem\AppData\Local\Programs\Python\Python312\python.exe C:\Users\auresystem\AppData\Local\Programs\craft-bridge\craft-bridge-mcp.py --slug figcraft --port 7981`
+
+- `list_commands`
+- `run_command`
+- `batch`
+- `create_node`
+- `set_properties`
+- `inspect_document`
+- `get_node`
+- `select`
+- `export`
+- `screenshot`
+- `open_file`
+- `save_file`
+- `undo`
+- `redo`
+- `pointer`
+- `key`
+- `type_text`
+- `inspect_ui`
 
 ### `filmcraft` (17 tool)
 

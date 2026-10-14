@@ -22,7 +22,7 @@ sources:
 | this repo | source: tools, documentation, reports | whoever develops and verifies |
 | `%LOCALAPPDATA%\Programs\craft-bridge` | installed copies of the shim, of `ident` and of the translator | Freebuff, at every MCP server start |
 | `%LOCALAPPDATA%\Programs\artcraft-mcp` | ArtCraft generative MCP and conformance proxy | Freebuff |
-| `~/.agents/mcp.json` | the 13 connector entries | Freebuff (Connectors panel) |
+| `~/.agents/mcp.json` | the 14 connector entries | Freebuff (Connectors panel) |
 
 The config entries point **at the installed copies**, never at the repo. That is why
 reorganising or moving this project leaves the connectors untouched: the global MCP keeps

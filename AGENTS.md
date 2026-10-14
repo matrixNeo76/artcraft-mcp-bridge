@@ -13,7 +13,7 @@ Every tool declares what it proved, and when it does not know it says so.
 
 | Path | Content |
 |---|---|
-| `tools/` | the Python tools. They run from here, they work from any folder (`craft-bridge-ui.py` is the PdfCraft window translator) |
+| `tools/` | the Python tools. They run from here, they work from any folder (`craft-bridge-ui.py` is the PdfCraft window translator; `craft-bridge-connect.py` registers the bridge in the other MCP clients, `craft-bridge-report.py` writes the status JSON and page) |
 | `install/` | `install-craft-mcp.ps1`, multi-client registration of the generative MCP |
 | `reports/` | generated artifacts; it is the default output of the tools, not the folder you invoke them from |
 | `docs/` | documentation in **OKF v0.2** (bundle: `docs/index.md`) |
@@ -44,8 +44,10 @@ Every tool declares what it proved, and when it does not know it says so.
 python -m py_compile tools/*.py              # syntax of every tool
 python tools/craft-bridge-doctor.py          # one verdict on the assembly (exit 0 = nothing to do)
 python tools/craft-bridge-mcp.py --flags     # the attach flag every CLI declares
-python tools/craft-bridge-tests.py --static  # ~34 s, the cases that start no app (19 of 23)
+python tools/craft-bridge-tests.py --static  # ~34 s, the cases that start no app (20 of 24)
 python tools/craft-bridge-feed.py            # installed against published (if the launcher is there)
+python tools/craft-bridge-connect.py --list  # which MCP clients are here (writes nothing)
+python tools/craft-bridge-report.py          # the whole state in reports/bridge-status.{json,html}
 python tools/craft-bridge-tests.py           # ~72 s, including the cases with real apps
 ```
 

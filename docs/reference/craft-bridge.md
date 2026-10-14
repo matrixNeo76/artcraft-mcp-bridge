@@ -11,7 +11,7 @@ status: stable
 # Crafting Apps — bridged mode of their MCP servers (experimentation)
 
 **Date:** 13 October 2026 · **Machine:** Windows x64, user `auresystem`
-**State:** tried live on 3 of 12 apps; protocol and credentials derived from the installed binaries.
+**State:** all 13 apps tried live (the 12 shim apps - FigCraft, the newest, in §6.2 - and PdfCraft by translation); protocol and credentials derived from the installed binaries.
 
 References: [analysis.md](./analysis.md) · [spec.md](./spec.md) · [plan.md](./plan.md)
 
@@ -61,6 +61,7 @@ CLI help.
 | `deckcraft` | `--control PORT` | `mcp --connect PORT` | 7972 | — | ✅ bridged, live screenshot |
 | `designcraft` | `--control` (env `DESIGNCRAFT_CONTROL_PORT`) | `mcp --connect PORT` | 7973 | — | ✅ bridged, live screenshot |
 | `effectcraft` | `--control <port>` | `mcp --bridge PORT` | 9877 | — | ✅ bridged, 27→36 tools |
+| `figcraft` | `--control PORT` | `mcp --attach PORT` | 7981 | — | ✅ bridged, 18 tools, `inspect_document` live (the same 18 as headless: this CLI adds no `ui_*`) |
 | `filmcraft` | `--control <port>` (env `FILMCRAFT_CONTROL_PORT`) | `mcp --bridge 127.0.0.1:PORT` | 7974 | — | ✅ bridged, `render_preview` live |
 | `gridcraft` | `--control 7979` | `mcp --connect PORT` | 7975 | — | ✅ bridged, `inspect_workbook` + screenshot |
 | `lightcraft` | `--control PORT` (env `LIGHTCRAFT_CONTROL_PORT`) | `mcp --connect [ADDR]` | 7980 | — | ✅ bridged, 326→**502** tools |
@@ -73,7 +74,8 @@ CLI help.
 Notes from the matrix:
 
 - The **bridge flag** column is no longer something we remember: `craft-bridge-mcp.py --flags` asks every CLI for its own help and compares (details and measurements in §5, *The attach flag*).
-- **Only 10 of 12 apps** expose `--control` as a port; PdfCraft uses a *control file* and its MCP server **has no** bridge flag. Two different roads remain: for 11 apps the bridge is the shim attaching to the channel, for PdfCraft it is a translator invoking the CLI (§5).
+- **Every shim app (12 of 13) exposes `--control` as a port**; PdfCraft is the one exception — it uses a *control file* and its MCP server **has no** bridge flag. Two different roads remain: for 12 apps the bridge is the shim attaching to the channel, for PdfCraft it is a translator invoking the CLI (§5).
+- The **bridge flag** is not the same name everywhere: FigCraft's CLI takes `--attach PORT` (a bare port; the others want an address), while the shim passes `--attach` exactly as it passes `--connect`/`--bridge`. The help check covers all three.
 - VectorCraft is the only one declaring an **automatic fallback** to headless when the app is not there; the others, if the app is missing, **fail** (verified: GridCraft, PhotoCraft).
 - `--automation-read-root` / `--automation-write-root` confine the files read/written by the agent, but **only in headless**: with `--connect` the app applies its own roots (WordCraft says so explicitly, VectorCraft too). It is a security difference to keep in mind.
 
@@ -172,7 +174,7 @@ opened, one can at least ask the CLI, one method at a time, for what the MCP ser
 expose. That is what [craft-bridge-ui.py](../../tools/craft-bridge-ui.py) does — 15 tools for
 the 15 methods the app declares, with the CLI invoked once per call (§5).
 
-Summary: **three apps out of twelve** verify a credential on the channel (PhotoCraft `token`,
+Summary: **three apps out of thirteen** verify a credential on the channel (PhotoCraft `token`,
 WordCraft `key`, PdfCraft `token`).
 
 ### 3.4 The handshake: who is behind the port (verified)
@@ -369,7 +371,19 @@ with no buffering.
 | [craft-bridge-launch.py](../../tools/craft-bridge-launch.py) | **starts one or more apps** with the channel already active on the ports the config expects |
 | [craft-bridge-ident.py](../../tools/craft-bridge-ident.py) | **who answers on the port and which build runs there**: handshake on the protocol, app recognised from the command catalogue, listening executable and version declared by the app |
 | [craft-bridge-doctor.py](../../tools/craft-bridge-doctor.py) | **a single verdict on the whole assembly**: repo, installed shim, config entries, executables, attach flag, PdfCraft window, credentials and the build running on the ports; at the end the actions to take |
-| [craft-bridge-tests.py](../../tools/craft-bridge-tests.py) | **the injected faults, runnable**: it breaks something on purpose (20 cases today), demands the right verdict from shim/translator/doctor/ident/launcher, puts things back and leaves the [report](../../reports/craft-bridge-tests.md) compared with the previous run |
+| [craft-bridge-tests.py](../../tools/craft-bridge-tests.py) | **the injected faults, runnable**: it breaks something on purpose (26 cases today), demands the right verdict from shim/translator/doctor/ident/launcher/connect/report, puts things back and leaves the [report](../../reports/craft-bridge-tests.md) compared with the previous run |
+| [craft-bridge-connect.py](../../tools/craft-bridge-connect.py) | **the bridge in every MCP client**: it writes the same entries (one source: `craft-bridge-config.py`'s `planned_entries()`) into the JSON, TOML or YAML file each client reads, with a dry-run by default |
+| [craft-bridge-report.py](../../tools/craft-bridge-report.py) | **the whole state in one place**: it gathers the doctor verdict, the entries, the clients, the baselines, the feed and the launch logs into `reports/bridge-status.json` and the page `reports/bridge-status.html` that reads it |
+
+### Other clients and the status page
+
+`craft-bridge-config.py` writes **one** config, the one the `.agents` clients read; the
+same shim, though, can be seen by every other MCP client installed on the machine, each
+with its own file and format. `craft-bridge-connect.py` closes that gap without a second
+source of truth, and `craft-bridge-report.py` shows the result: one JSON and one page with
+the verdict, the clients (and what each one is missing), the baselines and the logs. The
+recipe, client by client — including Codex's TOML and `dsh`'s Cordis YAML patch — is the
+runbook [Connect a client](../operations/connect-a-client.md).
 
 ### The shim
 
@@ -394,23 +408,23 @@ without killing the server.
 
 ### The attach flag, verified
 
-The table says which option is needed to drive the window (`--connect` for seven apps,
-`--bridge` for four) and for PdfCraft it says there is no flag. It is a declaration about an
+The table says which option is needed to drive the window (`--connect` for eight apps,
+`--bridge` for three, `--attach` for one — FigCraft) and for PdfCraft it says there is no flag. It is a declaration about an
 interface that is **not ours**: the CLI belongs to another piece of software and can change
 without asking. The bridge runs that flag at every start, so getting it wrong would only show
 up at the first connection.
 
 That is why the flag is asked of the party concerned: `craft-bridge-mcp.py --flags` launches
-every CLI's `--help` (in parallel, ~0.4 s for twelve) and compares. Three outcomes: `ok` (the
+every CLI's `--help` (in parallel, ~0.4 s for thirteen) and compares. Three outcomes: `ok` (the
 help names the declared flag; or, for the app with no attach, names none and documents
 `--control`), `diverge` (the table claims an option the help does not name — or the help names
 one the table does not use), `non leggibile` (the CLI prints no help: it stays a declaration,
 and it is written down as one).
 
-Measured on 13 October 2026: **11/11** CLIs document the declared flag, and `pdfcraft-cli
+Measured on 13 October 2026: **12/12** CLIs document the declared flag, and `pdfcraft-cli
 --help` names neither `--connect` nor `--bridge` but shows `ui --control FILE [method]` — the
 same thing the table claims, verified instead of remembered. The verdict sits in the diagnosis
-as the `flag di aggancio` line: **12/12** confirmed, and a table not confirmed is a `FIX` with
+as the `flag di aggancio` line: **13/13** confirmed, and a table not confirmed is a `FIX` with
 the action to take (demonstrated by injecting a test table with `doctor --apps-file`, which is
 also how the suite proves it).
 
@@ -500,6 +514,10 @@ too, which does not go through the shim. Measured with the window open:
 is, the mode is verifiable there too. The summary is now **13/13 entries OK, 12 with a bridge**
 (11 from the shim, `pdfcraft` from the translator).
 
+> **Update, same day**: with **FigCraft** added the numbers move by one — **14/14 entries OK,
+> 13 with a bridge** (12 from the shim, `pdfcraft` from the translator). The measurements below
+> were taken before it and are left as they were; the app is measured in §6.2.
+
 **Three apps open** on the ports the config expects (GridCraft 7975, PhotoCraft 7976 with the
 config's token, WordCraft 7978):
 
@@ -573,7 +591,38 @@ stderr, which declares `modalita' bridged` or `modalita' headless`.
 
 The raw sweep report is in [craft-bridge-sweep.json](../../reports/craft-bridge-sweep.json):
 for every app it contains the two tool lists, the app-only names, the startup command used and
-the outcome of the call.
+the outcome of the call. The sweep table predates FigCraft; the app was measured separately
+(§6.2).
+
+### 6.2 FigCraft, the newest app — and PdfCraft checked again (verified)
+
+**FigCraft** (installed 12 Oct, registered in `App Paths` as `C:\Program Files\FigCraft\figcraft.exe`)
+is not in the launcher's feed yet, so the feed lists 13 apps and does not name it: the
+comparison with the published release reports it as *absent* rather than counting it among the
+aligned ones. The bridge serves it like the others, and its channel answers the shim's own
+handshake.
+
+| Step | Measured |
+|---|---|
+| App opens the channel | `figcraft --control 7981` → log line `FigCraft control server listening on 127.0.0.1:7981` |
+| Handshake | `__craft_bridge_ident__` → `{"error":"unknown method …","id":1,"ok":false}`: same JSON-lines protocol, `peer=craft` |
+| Catalogue | `engine.commands` → **536** ids; `figcraft-cli commands --json` → the same **536**, coverage **1.00** (the identity check that spots the wrong app works unchanged) |
+| Bridge flag | `figcraft-cli mcp --attach 7981` → `attached to the FigCraft app at 127.0.0.1:7981`; the CLI help documents `--attach` |
+| Tools | **18** — `list_commands run_command batch create_node set_properties inspect_document get_node select export screenshot open_file save_file undo redo pointer key type_text inspect_ui`; **the same 18 in headless**, unlike the apps whose bridged mode adds `ui_*` |
+| Call on the window | `inspect_document` → the open document (`Untitled`, page 1, layers) |
+| Through the config | the entry written by the installer runs the shim, which declares `modalita' bridged (porta 7981, peer=craft)`; `doctor` confirms `figcraft 0.5.1 = config (stessa build)` |
+
+The CLI (0.5.1, like the app) takes a **bare port** for `--attach` ("--attach needs a port
+number"); the shim passes it exactly as it passes `--connect`/`--bridge`, so nothing in its mode
+decision changed.
+
+**PdfCraft checked again** (the bridge that had been “no response”): with a window open,
+`craft-bridge-ui.py --list` reports `bridged (la finestra risponde e autentica)`, port 61864,
+pid 38136, `pdfcraft-cli 0.7.1`, `catalogo: 15 metodi nostri, 15 dall'app: coincide`; the
+configured entry serves the 15 `ui_*` tools and `ui_commands` returns the window's own commands.
+`craft-bridge-launch.py --apps pdfcraft` starts it and confirms the channel. It is the same
+result as the first measurement, reproduced: the translation doesn't depend on the window having
+been started by the bridge.
 
 ---
 
@@ -712,9 +761,9 @@ the outcome of the call.
    23 passati, 0 falliti, 0 saltati
    ```
 
-   `--static` runs only the cases that start no app (19 of 23, ~34 s); the full suite **starts
+   `--static` runs only the cases that start no app (20 of 24, ~34 s); the full suite **starts
    real apps on free ports** and takes ~72 s. The cost grew with that of the tools that talk to
-   the CLIs (every `doctor` asks the help of twelve CLIs and queries the translator): that is
+   the CLIs (every `doctor` asks the help of thirteen CLIs and queries the translator): that is
    why the suite asks the doctor only what a single line cannot say. The safety rules are in the
    docstring and always hold: the real config is never written (the cases exercise it on a copy
    with `--config`), the only real file touched is the installed shim — one byte more, inside a
@@ -749,7 +798,7 @@ the outcome of the call.
 For the apps without a credential, the first command is enough without
 `--control-token-file`. The expected ports are the shim's ladder: `cadcraft 7971`, `deckcraft
 7972`, `designcraft 7973`, `filmcraft 7974`, `gridcraft 7975`, `photocraft 7976`, `soundcraft
-7977`, `wordcraft 7978`, `vectorcraft 7979`, `lightcraft 7980`, `effectcraft 9877` (the last
+7977`, `wordcraft 7978`, `vectorcraft 7979`, `lightcraft 7980`, `figcraft 7981`, `effectcraft 9877` (the last
 three are the defaults documented by the respective CLIs).
 
 The same step by hand, if you need one app and an explicit command:
@@ -765,8 +814,8 @@ The token file is written by the app: it need not be invented nor put into chat.
 
 ## 8. Limits and what is not verified
 
-- **12 of 12 apps driven and verified live**, each with a successful call on the window (§6.1).
-  For 11 the road is the shim attached to the channel; for PdfCraft it is the **translator**
+- **13 of 13 apps driven and verified live**, each with a successful call on the window (§6.1).
+  For 12 the road is the shim attached to the channel; for PdfCraft it is the **translator**
   invoking the CLI: neither is an attach to the vendor's MCP server, which for PdfCraft does not
   exist.
 - **Startup**: [craft-bridge-launch.py](../../tools/craft-bridge-launch.py) was tried **on all

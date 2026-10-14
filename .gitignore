@@ -10,6 +10,11 @@ reports/*.tmp.*
 reports/*.bak.*
 reports/*-logs/
 
+# La pagina di stato e' un'istantanea della macchina, rigenerata a ogni giro della
+# suite e pubblicata dalla CI come artefatto: versionarla vorrebbe dire un diff
+# sporco a ogni esecuzione, non una baseline.
+reports/bridge-status.*
+
 # Credenziali e stato locale: non entrano mai nel repo
 *.token
 .craft-bridge/

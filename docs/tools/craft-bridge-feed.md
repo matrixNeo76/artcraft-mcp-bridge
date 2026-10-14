@@ -101,16 +101,18 @@ the single member: measured on a 14.3 MB archive, a few tenths of a second. With
 
 # Measurement of 13 October 2026
 
-* 12 of 12 apps aligned with the published release, with the version read from the
-  executable (GridCraft from the recorded fingerprint).
+* 12 of 13 apps compared with the published release, with the version read from the
+  executable (GridCraft from the recorded fingerprint). `figcraft` is installed and the
+  launcher's `releases.json` names its repository, but the feed does **not** list it yet:
+  for it the line is an `absent`, not an "aligned".
 * **Byte for byte**: SoundCraft 0.6.1 — the installed `soundcraft-cli.exe` and the one
   inside `soundcraft-0.6.1-windows-x64-portable.zip` have the same `sha256`
   (`915ee3abb121b7b9...`), and the downloaded archive matches its published digest
-  (`cd5f8d98257f7711...`). The other 10 apps have no archive on disk: they are a `nota`
+  (`cd5f8d98257f7711...`). The other 11 apps have no archive on disk: they are a `nota`
   with the command to fetch it, not a missed comparison.
 * **Negative test**: one extra byte in the cached archive → `FIX byte soundcraft: non e'
   quello pubblicato: a4228f8080b2... != cd5f8d98257f...`, exit 1.
-* 12 of 12 apps aligned: `pdfcraft` 0.7.1 too, since the bridge serves it with the
+* 12 of 13 apps compared: `pdfcraft` 0.7.1 too, since the bridge serves it with the
   [translator](craft-bridge-ui.md) — the translator's apps are not in the shim table, so
   the table compared with the feed is the one of the apps **served by the bridge**
   (`CONFIG.bridge_table()`).

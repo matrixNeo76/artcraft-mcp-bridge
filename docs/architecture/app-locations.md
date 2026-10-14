@@ -18,7 +18,7 @@ sources:
 # The problem
 
 The app table declared `C:\Program Files\<App>\<app>-cli.exe` by hand for each of the
-eleven apps. The installed configuration contains the app **name**, not its path, so
+twelve apps. The installed configuration contains the app **name**, not its path, so
 updating those strings broke no connector: they aged in silence, and nobody would have
 noticed until an app moved.
 

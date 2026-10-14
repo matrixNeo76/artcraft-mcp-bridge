@@ -3,7 +3,7 @@
 
 Il problema
 -----------
-PdfCraft sa fare una cosa che le altre undici app non fanno, e non fa quella che
+PdfCraft sa fare una cosa che le altre dodici app non fanno, e non fa quella che
 fanno loro. L'app avviata con `--control FILE` apre un canale di controllo su una
 **porta casuale** e ne scrive i dettagli (`pid`, `port`, `token`) in un file JSON;
 la CLI lo raggiunge **un metodo per volta**:

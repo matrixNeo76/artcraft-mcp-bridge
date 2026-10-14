@@ -4,8 +4,8 @@
 
 **English** · [Italiano](README.it.md) · [Español](README.es.md) · [中文](README.zh.md)
 
-A bridge between the **Crafting Apps** (CADCraft, DeckCraft, DesignCraft, FilmCraft, GridCraft,
-LightCraft, PdfCraft, PhotoCraft, SoundCraft, VectorCraft, WordCraft, EffectCraft) and MCP
+A bridge between the **Crafting Apps** (CADCraft, DeckCraft, DesignCraft, EffectCraft, FigCraft,
+FilmCraft, GridCraft, LightCraft, PdfCraft, PhotoCraft, SoundCraft, VectorCraft, WordCraft) and MCP
 clients: instead of falling back to the interface-less CLI, the running app is driven through its
 **control channel**, so the tools act on the open window.
 
@@ -59,19 +59,44 @@ python tools/craft-bridge-verify.py
 
 Back to headless: `python tools/craft-bridge-config.py --restore`.
 
+## Other MCP clients
+
+Freebuff is not the only client. One command puts the same bridge into the others you
+have — Claude Desktop, Claude Code, Cursor, Windsurf, VS Code, Cline, LM Studio, Zed,
+Codex (ChatGPT desktop) and DeepSeek Harness (`dsh`) — each in its own file and format,
+from a single source and without touching what is not ours:
+
+```bash
+python tools/craft-bridge-connect.py --list     # who is here, and where it reads
+python tools/craft-bridge-connect.py            # dry-run: what would change
+python tools/craft-bridge-connect.py --apply    # writes, with a backup
+```
+
+The recipe, client by client (including the two that are not JSON), is in
+[docs/operations/connect-a-client.md](docs/operations/connect-a-client.md).
+
+To see the whole state at a glance — verdict, entries, clients, baselines, feed, logs —
+in one JSON and one page that reads it:
+
+```bash
+python tools/craft-bridge-report.py             # reports/bridge-status.json + .html
+python tools/craft-bridge-report.py --serve     # + local server, opens the page (Ctrl+C to stop)
+```
+
 ## Verified state (13 October 2026)
 
 | Proof | Outcome |
 |---|---|
-| Apps driveable with a successful call on the window | 12 of 12 (11 bridged through the shim, PdfCraft by translation) |
-| Config entries run with the real command | 13/13 |
-| Fault suite (24 cases, injected faults) | 23/23 run, 1 skipped with a reason (PdfCraft window closed), two runs in a row identical |
-| Installed against the release published by the launcher | 12 of 12 aligned (feed of 13 October) |
-| Bytes of the installed CLI against the published ones | 1 of 11 tried: SoundCraft identical (`sha256 915ee3abb121…`); for the others the archive is not on disk |
-| App and CLI paths | 11 of 11 from the `App Paths` registry (the table confirms, it does not decide) |
+| Apps driveable with a successful call on the window | 13 of 13 (12 bridged through the shim — `figcraft` included — PdfCraft by translation) |
+| Config entries run with the real command | 14/14 |
+| Fault suite (28 cases, injected faults) | 27 run + 1 skipped with the PdfCraft window closed (the one live case says why), 23+1 in `--static`, two runs in a row identical |
+| Clients the bridge is registered in | 13 known, 4 present on this machine; after `--apply` all at **13/13** (before: `agents` 13, `claude-desktop` and `antigravity` **12** as headless entries, `windsurf` **0**) |
+| Installed against the release published by the launcher | 12 of 13 compared (feed of 13 October): the feed does not name `figcraft` yet, so for it there is no term of comparison and the diagnosis says so |
+| Bytes of the installed CLI against the published ones | 1 of 12 tried: SoundCraft identical (`sha256 915ee3abb121…`); for the others the archive is not on disk |
+| App and CLI paths | 12 of 12 from the `App Paths` registry (the table confirms, it does not decide) |
 | PdfCraft window methods | 15 of 15 as the app declares them; 192 commands, 107 widgets, screenshot of the window |
-| Attach flags declared by the table | 12 of 12 confirmed by the CLI help (11 `--connect`/`--bridge` attaches, PdfCraft with no flag and with `--control`) |
-| Tool inventory of the servers | 13/13 servers, 618 tools (`pdfcraft`: the 15 window methods) |
+| Attach flags declared by the table | 13 of 13 confirmed by the CLI help (11 `--connect`/`--bridge` and 1 `--attach` attaches, PdfCraft with no flag and with `--control`) |
+| Tool inventory of the servers | 14/14 servers, 636 tools (`pdfcraft`: the 15 window methods; `figcraft`: 18) |
 | Overall diagnosis | `tutto in ordine` |
 
 ## Documentation
@@ -82,11 +107,11 @@ found). The long, complete text, with every measurement, is
 [docs/reference/craft-bridge.md](docs/reference/craft-bridge.md).
 
 ```bash
-uvx okfgen validate docs --strict                      # conformant: 32 concepts, 0 errors
+uvx okfgen validate docs --strict                      # conformant: 35 concepts, 0 errors
 uvx okfgen visualize docs -o reports/okf-graph.html    # interactive graph of the bundle
 ```
 
-The generated graph is in [reports/okf-graph.html](reports/okf-graph.html): 32 nodes, 162 relations.
+The generated graph is in [reports/okf-graph.html](reports/okf-graph.html): 35 nodes, 182 relations.
 
 ## What is installed, against what is published
 

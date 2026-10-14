@@ -17,13 +17,13 @@ sources:
 
 # What it does
 
-Ten checks in one command, each `ok` / `FIX` / `nota`: repo, installed copies, config
+Eleven checks in one command, each `ok` / `FIX` / `nota`: repo, installed copies, config
 entries, the paths they mention, the app executables, **where the app is** (the
 `App Paths` registry against the table), **the attach flag** (does the CLI help name what
 the table uses?), **the PdfCraft window** (does the
 [translator](../tools/craft-bridge-ui.md) answer? and are its methods the ones the app
-declares?), **what the vendor publishes** against what is installed, credentials, and - on
-the listening ports - who answers and which build runs there.
+declares?), **what the vendor publishes** against what is installed, the **other MCP
+clients**, and - on the listening ports - who answers and which build runs there.
 
 The comparison with the published release looks at the apps the bridge **serves**, not
 only the ones of the shim: the translator's ones are there too (`pdfcraft`).
@@ -47,7 +47,7 @@ The `flag di aggancio` line is the most direct of the three: the bridge runs
 one the CLI accepts. Here the question is put to the CLI help (one per app, ~0.7 s in
 total): if the table claims an option the help does not name, or if the help names one the
 table does not use, it is a `FIX` with the action `--flags`; a CLI that prints no help is
-not an `ok`, it is a `nota` that says so. Measured: **12/12** confirmed - 11 attaches and
+not an `ok`, it is a `nota` that says so. Measured: **13/13** confirmed - 12 attaches and
 1 for translation. Details in [craft-bridge-mcp](craft-bridge-mcp.md).
 
 The `finestra pdfcraft` line has three outcomes too, and the reason is the same: that the
@@ -57,6 +57,17 @@ instead if the translator does not answer at all, because then the entry does no
 When the window is there, the line compares the **15 methods** of the table with the ones
 the app declares: it is the only thing no one else can do, because the table is a copy of
 what the app says it can do.
+
+The `client MCP` line answers the question the user actually asks - "does my Claude / Cursor
+/ `dsh` see the bridge?": for every client present on the machine it counts how many of the
+entries the [connector](craft-bridge-connect.md) would write are **there as bridge entries**
+(naming the shim or the translator). An entry left **headless** by the vendor's installer
+does **not** count - and that is exactly the fault found on this machine: Claude Desktop and
+Antigravity sat at 12/13 with the vendor CLI. The counting is `craft-bridge-connect.py`'s own
+(one definition, so the diagnosis and the connector cannot diverge); `agents` stays out,
+because its config is checked exactly by `config`. The action is
+`python craft-bridge-connect.py --apply`; a client that is not installed is not a fault, and
+with no client besides `.agents` the line is a `nota`.
 
 Then at the end it puts **only the problems, numbered, with the action that fixes each**.
 The doctor changes nothing by itself: it advises, and you run the action (or the suite
@@ -71,6 +82,7 @@ python tools/craft-bridge-doctor.py --json         # checks / problems / actions
 python tools/craft-bridge-doctor.py --install-dir <dir> --config <file>
 python tools/craft-bridge-doctor.py --feed-dir <folder>   # test launcher feed
 python tools/craft-bridge-doctor.py --apps-file table.json  # test table (diagnosis)
+python tools/craft-bridge-doctor.py --client-path cursor=f.json  # a client's file (tests)
 ```
 
 # Test tables are the whole world
@@ -93,7 +105,7 @@ right to be `ok`.
 
 # Cost
 
-~2.7 s with the apps closed: ~0.8 s for the twelve CLI helps (one per app served by the
+~2.7 s with the apps closed: ~0.8 s for the thirteen CLI helps (one per app served by the
 bridge, the most expensive part), and the rest for the comparison with the feed and the
 executable versions, which are read once and used by two checks. A few seconds more with
 apps open (one catalogue read per occupied port).
@@ -105,6 +117,7 @@ apps open (one catalogue read per occupied port).
 - **uses** [craft-bridge-feed](craft-bridge-feed.md) for the published release, against the installed build
 - **asks the shim** [craft-bridge-mcp](craft-bridge-mcp.md) for the declared attach flag, and the CLI whether it is true
 - **watches** [craft-bridge-ui](craft-bridge-ui.md) - installed copy and catalogue of the PdfCraft window
+- **counts the entries of the other clients with** [craft-bridge-connect](craft-bridge-connect.md) - one definition for both
 - **it takes the paths from** [Where the app is](../architecture/app-locations.md) - the system registry, with the table as confirmation
 - **verified by** [craft-bridge-tests](craft-bridge-tests.md) - every `FIX` proved by injecting the fault
 - **in the runbook** [Diagnosis and verification](../operations/diagnosis.md)

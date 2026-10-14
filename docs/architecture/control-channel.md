@@ -41,7 +41,7 @@ PhotoCraft requires a token: the app **writes it itself** into
 | designcraft | 7973 | vectorcraft | 7979 |
 | filmcraft | 7974 | lightcraft | 7980 |
 | gridcraft | 7975 | effectcraft | 9877 |
-| photocraft | 7976 | | |
+| photocraft | 7976 | figcraft | 7981 |
 
 The last three are the defaults documented by the respective CLIs; the others come from
 the shim table, which is a **single source** for config and diagnosis (`--dump-apps`).

@@ -21,8 +21,9 @@ It reads `~/.agents/mcp.json` (the same config the Connectors panel uses), start
 stdio server, performs the handshake and asks `tools/list`. It writes a Markdown report.
 It is read-only: it modifies no configuration.
 
-Last outcome: **13/13 servers connected, 618 tools** inventoried (for `pdfcraft` the 15
-methods of the window: see [craft-bridge-ui](craft-bridge-ui.md)).
+Last outcome: **14/14 servers connected, 636 tools** inventoried (for `pdfcraft` the 15
+methods of the window: see [craft-bridge-ui](craft-bridge-ui.md); for `figcraft` 18, the
+same list headless and bridged).
 
 # Interface
 

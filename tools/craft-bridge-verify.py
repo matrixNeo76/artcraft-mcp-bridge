@@ -28,7 +28,7 @@ HERE = Path(__file__).resolve().parent
 PROBE = HERE / "craft-bridge-probe.py"
 DEFAULT_CONFIG = Path.home() / ".agents" / "mcp.json"
 
-# Le entry che dichiarano un modo (bridged o headless): lo shim per le 11 app con
+# Le entry che dichiarano un modo (bridged o headless): lo shim per le 12 app con
 # canale su porta, il traduttore per PdfCraft, che l'MCP non ce l'ha.
 BRIDGES = ("craft-bridge-mcp.py", "craft-bridge-ui.py")
 

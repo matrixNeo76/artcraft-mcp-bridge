@@ -37,6 +37,7 @@ APPS = {
     "deckcraft": "DeckCraft",
     "designcraft": "DesignCraft",
     "effectcraft": "EffectCraft",
+    "figcraft": "FigCraft",
     "filmcraft": "FilmCraft",
     "gridcraft": "GridCraft",
     "lightcraft": "LightCraft",

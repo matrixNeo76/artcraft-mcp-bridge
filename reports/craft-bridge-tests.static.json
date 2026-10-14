@@ -1,5 +1,5 @@
 {
-  "when": "2026-10-13T22:01:19",
+  "when": "2026-10-14T10:04:21",
   "host": "wkai01",
   "python": "3.12.10",
   "modes": {
@@ -8,13 +8,15 @@
     "ci": false
   },
   "tools": {
-    "craft-bridge-mcp.py": "e63385cf6422",
+    "craft-bridge-mcp.py": "f52a99d7261f",
     "craft-bridge-ident.py": "8df181789548",
-    "craft-bridge-doctor.py": "095fb4828ac5",
+    "craft-bridge-doctor.py": "41414d417fbf",
     "craft-bridge-config.py": "236ff781b8ee",
     "craft-bridge-feed.py": "c65b3ac8ee1a",
-    "craft-bridge-tests.py": "92b472ab9bfa",
-    "craft-bridge-ui.py": "bed1af7f410d"
+    "craft-bridge-tests.py": "96aed04d9920",
+    "craft-bridge-ui.py": "ed3cab22827d",
+    "craft-bridge-connect.py": "b8fccd17a9d0",
+    "craft-bridge-report.py": "0957d425a9f8"
   },
   "cases": [
     {
@@ -22,28 +24,28 @@
       "kind": "static",
       "state": "PASS",
       "detail": "doctor: nessuna azione",
-      "seconds": 2.8
+      "seconds": 6.2
     },
     {
       "case": "shim installato stantio",
       "kind": "static",
       "state": "PASS",
       "detail": "accusato e riparato dall'azione indicata",
-      "seconds": 5.9
+      "seconds": 12.6
     },
     {
       "case": "entry di config sbagliata",
       "kind": "static",
       "state": "PASS",
       "detail": "doctor e installer concordano: 1 entry da aggiornare",
-      "seconds": 3.1
+      "seconds": 6.5
     },
     {
       "case": "percorso inesistente",
       "kind": "static",
       "state": "PASS",
       "detail": "FIX percorsi: cadcraft.command",
-      "seconds": 2.8
+      "seconds": 6.1
     },
     {
       "case": "eseguibile mancante",
@@ -63,7 +65,7 @@
       "case": "app registrate dal sistema",
       "kind": "static",
       "state": "PASS",
-      "detail": "11/11 percorsi dal registro App Paths, hive utente e macchina, tabella confermata, avvio sull'eseguibile registrato",
+      "detail": "12/12 percorsi dal registro App Paths, hive utente e macchina, tabella confermata, avvio sull'eseguibile registrato",
       "seconds": 0.0
     },
     {
@@ -92,7 +94,7 @@
       "kind": "static",
       "state": "PASS",
       "detail": "assente 3, illeggibile 3, estraneo 0 (nessun guasto inventato)",
-      "seconds": 2.5
+      "seconds": 4.1
     },
     {
       "case": "cancello sulle regressioni",
@@ -106,7 +108,7 @@
       "kind": "live",
       "state": "PASS",
       "detail": "ident unreachable, shim headless (porta 7979)",
-      "seconds": 5.2
+      "seconds": 6.8
     },
     {
       "case": "argomenti della chiamata",
@@ -120,7 +122,7 @@
       "kind": "unit",
       "state": "PASS",
       "detail": "15 tool, parametri tipizzati, immagine, isError su guasto, -32602 sull'ignoto, modo bridged dichiarato, finestra sparita a meta' sessione diagnosticata",
-      "seconds": 3.4
+      "seconds": 3.5
     },
     {
       "case": "senza finestra il traduttore ripiega",
@@ -133,7 +135,7 @@
       "case": "finestra PdfCraft dal vivo",
       "kind": "static",
       "state": "SKIP",
-      "detail": "finestra chiusa (nessuno in ascolto sulla porta 48129 (file stantio?)): l'entry va headless",
+      "detail": "finestra chiusa (nessuno in ascolto sulla porta 4497 (file stantio?)): l'entry va headless",
       "seconds": 0.8
     },
     {
@@ -148,24 +150,54 @@
       "kind": "unit",
       "state": "PASS",
       "detail": "tabella non confermata -> FIX con l'azione; confermata dal canale -> ok; CLI assente -> nota",
-      "seconds": 5.1
+      "seconds": 10.6
     },
     {
       "case": "flag di aggancio dal vivo",
       "kind": "static",
       "state": "PASS",
-      "detail": "11/11 CLI documentano il flag della tabella, e la diagnosi lo ripete",
-      "seconds": 3.0
+      "detail": "12/12 CLI documentano il flag della tabella, e la diagnosi lo ripete",
+      "seconds": 6.5
+    },
+    {
+      "case": "client MCP multipli",
+      "kind": "static",
+      "state": "PASS",
+      "detail": "JSON, VS Code, TOML e YAML: scritti, idempotenti, restore pulito",
+      "seconds": 1.5
+    },
+    {
+      "case": "report di stato",
+      "kind": "static",
+      "state": "PASS",
+      "detail": "json 14 entry, html 21522 byte",
+      "seconds": 0.4
+    },
+    {
+      "case": "report --serve",
+      "kind": "static",
+      "state": "PASS",
+      "detail": "servito su 127.0.0.1:18966: pagina 200 e JSON con lo schema",
+      "seconds": 1.3
+    },
+    {
+      "case": "client MCP nella diagnosi",
+      "kind": "static",
+      "state": "PASS",
+      "detail": "accusa cursor 0/13 (1) e tace con le 13 (0)",
+      "seconds": 12.4
     }
   ],
-  "passed": 19,
+  "passed": 23,
   "failed": 0,
   "skipped": 1,
   "ok": true,
-  "seconds": 36.0,
-  "compared_with": "2026-10-13T21:57:56",
-  "previous_seconds": 36.0,
-  "changes": [],
+  "seconds": 80.7,
+  "compared_with": "2026-10-14T09:56:32",
+  "previous_seconds": 80.6,
+  "changes": [
+    "`craft-bridge-tests.py`: fde5fea4ce26 -> 96aed04d9920"
+  ],
   "regressions": [],
   "gate": {
     "applied": true,

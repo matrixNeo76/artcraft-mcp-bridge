@@ -9,8 +9,8 @@
 
       A) ArtCraft generativo  -> artcraft-mcp.exe            (61 tool, cloud)
       B) Crafting Apps suite  -> "<App>\<app>-cli.exe" mcp   (una entry per app)
-         CADCraft, DeckCraft, DesignCraft, EffectCraft, FilmCraft, GridCraft,
-         LightCraft, PdfCraft, PhotoCraft, SoundCraft, VectorCraft, WordCraft
+         CADCraft, DeckCraft, DesignCraft, EffectCraft, FigCraft, FilmCraft,
+         GridCraft, LightCraft, PdfCraft, PhotoCraft, SoundCraft, VectorCraft, WordCraft
 
     Client gestiti:
       - Freebuff        : ~\.agents\mcp.json                          (merge JSON)
@@ -115,6 +115,7 @@ $SuiteApps = [ordered]@{
     deckcraft   = 'DeckCraft'
     designcraft = 'DesignCraft'
     effectcraft = 'EffectCraft'
+    figcraft    = 'FigCraft'
     filmcraft   = 'FilmCraft'
     gridcraft   = 'GridCraft'
     lightcraft  = 'LightCraft'

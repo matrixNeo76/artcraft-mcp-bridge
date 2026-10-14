@@ -75,6 +75,14 @@ try:
 except SystemExit as exc:
     FEED = None
     FEED_WHY = str(exc)
+# Gli altri client MCP (Claude Desktop, Cursor, Codex, dsh...): le entry attese e il modo
+# di contarle le dichiara `craft-bridge-connect.py`, cosi' la diagnosi e il connettore non
+# possono divergere. Se lo strumento non c'e', il controllo lo dice e continua.
+try:
+    CONNECT = _load("craft_bridge_connect", "craft-bridge-connect.py")
+except SystemExit as exc:
+    CONNECT = None
+    CONNECT_WHY = str(exc)
 
 # Cosa deve esserci nel repo perche' l'assieme funzioni.
 REQUIRED = ("craft-bridge-mcp.py", "craft-bridge-ident.py", "craft-bridge-config.py",
@@ -303,7 +311,8 @@ def check_translator(install_dir: Path, control_file: str) -> list[dict]:
 def check_bridge_flags(table: dict, timeout: float = 20.0) -> list[dict]:
     """Il flag di aggancio **verificato**, non dichiarato: lo dice l'help di ogni CLI.
 
-    La tabella promette un'opzione per guidare la finestra (`--connect`/`--bridge`), e
+    La tabella promette un'opzione per guidare la finestra (`--connect`/`--bridge`/
+    `--attach`), e
     per le app del traduttore promette che quell'opzione **non** c'e'. Sono promesse su
     una interfaccia che non e' la nostra, quindi si chiedono alla CLI stessa: se l'help
     non nomina il flag dichiarato, la tabella sta affermando qualcosa che la CLI non
@@ -328,9 +337,13 @@ def check_bridge_flags(table: dict, timeout: float = 20.0) -> list[dict]:
                        f"una dichiarazione della tabella",
                        "lancia la CLI di quelle app con --help: se non lo stampa, la "
                        "tabella e' l'unica fonte")]
-    return [result("flag di aggancio", "ok",
-                   f"{confirmed}/{total} app: l'help della CLI documenta il flag che la "
-                   f"tabella usa (11 agganci, 1 per traduzione)")]
+    translated = sum(1 for r in report["rows"] if r.get("translated"))
+    shimmed = total - translated
+    detail = (f"{confirmed}/{total} app: l'help della CLI documenta il flag che la "
+              f"tabella usa ({shimmed} agganci"
+              + (", 1 per traduzione" if translated == 1 else
+                 f", {translated} per traduzione" if translated else "") + ")")
+    return [result("flag di aggancio", "ok", detail)]
 
 
 def check_published(table: dict, feed_dir: Path, file_facts: dict | None = None) -> list[dict]:
@@ -361,6 +374,12 @@ def check_published(table: dict, feed_dir: Path, file_facts: dict | None = None)
     behind = [r for r in rows if r.get("kind") == "behind"]
     ahead = [r for r in rows if r.get("kind") == "ahead"]
     unknown = [r for r in rows if r.get("kind") == "unknown"]
+    # Le app che il feed non nomina non sono "allineate": non sono state confrontate.
+    # Contarle fra le allineate era un verde che mentiva su un'app appena installata:
+    # il feed del launcher e' un file locale e puo' essere piu' vecchio delle app.
+    absent = [r for r in rows if r.get("kind") == "absent"]
+    compared = sum(1 for r in rows
+                   if r.get("check") in table and r.get("kind") != "absent")
     when = feed.get("fetched_at") or "?"
     if behind or ahead:
         listed = ", ".join(f"{r['check']} {r['detail'].split(' (')[0]}"
@@ -373,8 +392,15 @@ def check_published(table: dict, feed_dir: Path, file_facts: dict | None = None)
                        f"versione installata non leggibile per "
                        f"{', '.join(r['check'] for r in unknown)} (feed del {when})",
                        "avvia l'app dalla sua entry una volta")]
+    if absent:
+        names = ", ".join(r["check"] for r in absent)
+        return [result("pubblicato", "nota",
+                       f"{compared}/{len(table)} app confrontate col feed del {when}; il feed "
+                       f"non nomina {names}: per quelle non c'e' un termine di paragone",
+                       "aggiorna il feed dal launcher (`python craft-bridge-feed.py`) quando "
+                       "l'app compare fra le pubblicate")]
     return [result("pubblicato", "ok",
-                   f"{len(table)} app allineate alla release pubblicata (feed del {when})")]
+                   f"{compared} app allineate alla release pubblicata (feed del {when})")]
 
 
 def check_live(table: dict, entries: dict, file_facts: dict | None = None) -> list[dict]:
@@ -390,7 +416,7 @@ def check_live(table: dict, entries: dict, file_facts: dict | None = None) -> li
     for slug, port in sorted(ports.items()):
         pid = pids.get(port)
         if pid is None:
-            continue  # nessuno in ascolto: lo dice la riga in fondo, non undici righe
+            continue  # nessuno in ascolto: lo dice la riga in fondo, non dodici righe
         token_file = (entries.get(slug) or {}).get("token_file")
         token = IDENT.read_token(token_file)
         field = "token"
@@ -458,6 +484,57 @@ def check_live(table: dict, entries: dict, file_facts: dict | None = None) -> li
     return out
 
 
+def check_clients(install_dir: Path, token_file: str, control_file: str,
+                  overrides: dict | None = None,
+                  client_paths: dict | None = None) -> list[dict]:
+    """Gli altri client MCP: ognuno vede le entry del ponte che il connettore scriverebbe?
+
+    E' la domanda vera dell'utente ("Claude/Cursor/dsh vedono il ponte?"): un'entry
+    **del ponte** nomina lo shim o il traduttore; un'entry headless del fornitore (la CLI
+    con `mcp`) **non** conta — ed e' il guasto che aveva lasciato tre client a leggere la
+    CLI. La conta la fa `craft-bridge-connect.py` (una sola definizione, come per il
+    config), quindi diagnosi e connettore non possono divergere. `agents` resta fuori: la
+    sua config la controlla `config`, in modo esatto.
+    """
+    if CONNECT is None:
+        return [result("client MCP", "nota",
+                       f"connettore non disponibile ({CONNECT_WHY})", "")]
+    try:
+        plan = CONFIG.planned_entries(CONFIG.apps_table(), install_dir / CONFIG.WRAPPER.name,
+                                      token_file, overrides=overrides,
+                                      install_dir=install_dir, control_file=control_file)
+    except SystemExit as exc:
+        return [result("client MCP", "nota", f"entry non calcolabili ({exc})", "")]
+    expected = set(plan)
+    present, problems, unknown = [], [], []
+    for c in CONNECT.clients():
+        if c["id"] == "agents":
+            continue
+        path = CONNECT.client_path(c, client_paths)
+        if path is None or not path.parent.is_dir():
+            continue                                     # client non installato: non e' un guasto
+        present.append(c["id"])
+        have = CONNECT.bridge_slugs(c, path, expected)
+        if have is None:
+            unknown.append(c["id"])
+        elif len(have) < len(expected):
+            problems.append(f"{c['id']} {len(have)}/{len(expected)}")
+    rows = []
+    if problems:
+        rows.append(result("client MCP", "fail", "; ".join(problems),
+                           "python craft-bridge-connect.py --apply"))
+    elif present:
+        rows.append(result("client MCP", "ok",
+                           f"{len(present)} client presenti, tutti con le {len(expected)} "
+                           f"entry del ponte ({', '.join(present)})"))
+    else:
+        rows.append(result("client MCP", "nota", "nessun client MCP oltre .agents su questa macchina", ""))
+    if unknown:
+        rows.append(result("client MCP", "nota",
+                           f"non leggibili da un file: {', '.join(unknown)}", ""))
+    return rows
+
+
 def main() -> int:
     try:
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -481,6 +558,9 @@ def main() -> int:
     parser.add_argument("--apps-file",
                         help="tabella delle app da un file, invece che dallo shim: serve a "
                              "provare la diagnosi su una tabella di prova")
+    parser.add_argument("--client-path", action="append", default=[], metavar="ID=FILE",
+                        help="il file di un client MCP diverso dal default (ripetibile): "
+                             "serve a provare il controllo `client MCP` su file di prova")
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
 
@@ -512,6 +592,8 @@ def main() -> int:
     rows += check_bridge_flags(bridge_apps, timeout=args.flag_timeout)
     rows += check_translator(install_dir, args.control_file)
     rows += check_published(bridge_apps, Path(args.feed_dir), exe_facts)
+    rows += check_clients(install_dir, args.token_file, args.control_file,
+                          client_paths=dict(p.split("=", 1) for p in args.client_path))
     if not args.no_live:
         rows += check_live(table, entries, exe_facts)
 

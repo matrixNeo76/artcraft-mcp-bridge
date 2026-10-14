@@ -19,8 +19,8 @@ It does not trust the config: it **runs** it. For every entry it launches the co
 written in the file, performs the MCP handshake, asks `tools/list` and - if requested -
 calls a tool.
 
-It is the proof that the real path (Freebuff starting the shim) works: 13/13 entries
-verified last time, **12 with a bridge** (11 through the shim, `pdfcraft` through the
+It is the proof that the real path (Freebuff starting the shim) works: 14/14 entries
+verified last time, **13 with a bridge** (12 through the shim, `pdfcraft` through the
 [translator](craft-bridge-ui.md)).
 
 # The mode is read, for PdfCraft too

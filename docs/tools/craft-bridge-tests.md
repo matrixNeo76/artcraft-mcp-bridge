@@ -1,7 +1,7 @@
 ---
 type: Tool
 title: "craft-bridge-tests - the suite that injects faults"
-description: "Twenty-four cases that break something on purpose and demand the right verdict from shim, translator, doctor, ident and launcher; every run leaves a report compared with the saved baseline, and a case that gets worse stops the run with its own exit code."
+description: "Twenty-eight cases that break something on purpose and demand the right verdict from shim, translator, doctor, ident, launcher and the multi-client connector; every run leaves a report compared with the saved baseline, refreshes the status page and, when a case gets worse, stops the run with its own exit code."
 resource: ../../tools/craft-bridge-tests.py
 tags: [tool, tests, faults, report]
 generated: { by: process:freebuff-buffy, at: 2026-10-13T19:55:00Z }
@@ -59,12 +59,13 @@ really needs nothing, because there the fake CLI **is** the headless server.
 # Interface
 
 ```
-python tools/craft-bridge-tests.py                 # everything (~76 s, starts real apps)
-python tools/craft-bridge-tests.py --static        # only the cases without apps (~36 s, 20 of 24)
+python tools/craft-bridge-tests.py                 # everything (~160 s, starts real apps)
+python tools/craft-bridge-tests.py --static        # only the cases without apps (~80 s, 24 of 28)
 python tools/craft-bridge-tests.py --only build --json
 python tools/craft-bridge-tests.py --report reports/my.json --compare old.json
 python tools/craft-bridge-tests.py --static --ci   # on a runner without an installed bridge
 python tools/craft-bridge-tests.py --no-gate       # compare, but do not decide the exit code
+python tools/craft-bridge-tests.py --no-status     # do not refresh the status page at the end
 ```
 
 # `--ci`
@@ -90,6 +91,12 @@ Every run writes `reports/craft-bridge-tests.json` (machine) and
 `reports/craft-bridge-tests.md` (readable), and compares itself with the previous run:
 cases changed, appeared, disappeared, fingerprints of the tools. Duration is context.
 `--no-report` writes nothing, `--no-compare` reads nothing.
+
+At the end the run also **refreshes the status page**: it calls
+[craft-bridge-report](craft-bridge-report.md), which reads the baselines just written, so
+`reports/bridge-status.json` and `.html` show the last execution instead of an old
+photograph. It is a convenience, not another measurement: if it fails it says so and does not
+fail the suite. `--no-status` (or `--no-report`, which writes nothing at all) turns it off.
 
 # The gate on regressions
 
@@ -148,6 +155,8 @@ disappear at the end.
 - **and the translator** [craft-bridge-ui](craft-bridge-ui.md) - arguments, MCP session, fallback and live window
 - **and the attach flag** [craft-bridge-mcp](craft-bridge-mcp.md) - against the help of every CLI (fake CLIs, and live)
 - **and the paths** [Where the app is](../architecture/app-locations.md) - the three outcomes of the choice, without touching the registry
+- **exercises** [craft-bridge-connect](craft-bridge-connect.md) and [craft-bridge-report](craft-bridge-report.md) - writing on temporary files, and `--serve`
+- **refreshes at the end** [craft-bridge-report](craft-bridge-report.md) - so the status page is the last run
 - **decides against the saved baseline** [Reports and baseline](../architecture/reports.md)
 - **in the runbook** [Diagnosis and verification](../operations/diagnosis.md)
 - **run on every push by** [Continuous integration](../operations/ci.md) with `--static --ci`

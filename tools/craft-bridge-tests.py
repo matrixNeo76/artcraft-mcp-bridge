@@ -102,6 +102,7 @@ import sys
 import tempfile
 import threading
 import time
+import urllib.request
 import zipfile
 from datetime import datetime
 from pathlib import Path
@@ -1277,18 +1278,175 @@ def t_bad_token(run: Runner) -> tuple[str, str]:
     return "PASS", "token diverso: accusato da doctor e ident (valore mai stampato)"
 
 
+@case("client MCP multipli", "static")
+def t_connect_clients(run: Runner) -> tuple[str, str]:
+    """Il connettore scrive nella forma giusta e non tocca quello che non e' suo.
+
+    Tutto su file temporanei con `--client-path` (e `--client` limita i bersagli): la
+    config vera di un client non e' una cavia, come per `--config` negli altri casi.
+    Copre le tre forme che non sono `mcpServers`: VS Code, TOML di Codex, YAML di dsh.
+    """
+    root = run.tmp / "connect"
+    root.mkdir()
+    agents = root / "agents.json"
+    agents.write_text(json.dumps({"mcpServers": {"keepme": {"type": "stdio",
+                     "command": "x", "args": [], "env": {}}}}), encoding="utf-8")
+    vscode = root / "vscode.json"
+    vscode.write_text(json.dumps({"servers": {"keepme": {"type": "stdio",
+                      "command": "x", "args": [], "env": {}}}}), encoding="utf-8")
+    codex = root / "config.toml"
+    codex.write_text('[mcp_servers.keepme]\ncommand = "x"\n', encoding="utf-8")
+    dsh = root / "cordis.patch.yml"
+    dsh.write_text("- insert:\n    - id: altri\n      name: '@altro/plugin'\n", encoding="utf-8")
+
+    def conn(*extra: str):
+        return run.run(str(HERE / "craft-bridge-connect.py"),
+                       "--client", "agents", "--client", "vscode-workspace",
+                       "--client", "codex", "--client", "dsh",
+                       "--client-path", f"agents={agents}",
+                       "--client-path", f"vscode-workspace={vscode}",
+                       "--client-path", f"codex={codex}",
+                       "--client-path", f"dsh={dsh}",
+                       "--apps", "cadcraft,deckcraft", *extra)
+
+    before = agents.read_text(encoding="utf-8")
+    code, out, _ = conn()                                   # dry-run: non scrive
+    if code != 0 or agents.read_text(encoding="utf-8") != before:
+        return "FAIL", f"il dry-run ha scritto (uscita {code})"
+
+    code, out, _ = conn("--apply")
+    if code != 0:
+        return "FAIL", f"apply uscita {code}: {out[-160:]}"
+    data = json.loads(agents.read_text(encoding="utf-8"))
+    if "keepme" not in data["mcpServers"] or "cadcraft" not in data["mcpServers"]:
+        return "FAIL", "JSON mcpServers: entry aggiunte o estranee perse"
+    args = data["mcpServers"]["cadcraft"].get("args") or []
+    if not args or args[0] != str(CONFIG.DEFAULT_INSTALL_DIR / "craft-bridge-mcp.py"):
+        return "FAIL", "JSON: gli args non puntano allo shim installato"
+    vs = json.loads(vscode.read_text(encoding="utf-8"))
+    if "cadcraft" not in (vs.get("servers") or {}):
+        return "FAIL", "VS Code (.vscode): entry scritta sotto la chiave sbagliata"
+    if "[mcp_servers.cadcraft]" not in codex.read_text(encoding="utf-8") or \
+            "[mcp_servers.keepme]" not in codex.read_text(encoding="utf-8"):
+        return "FAIL", "TOML: blocco mancante o estraneo perso"
+    if "id: craft-bridge-cadcraft" not in dsh.read_text(encoding="utf-8") or \
+            "id: altri" not in dsh.read_text(encoding="utf-8"):
+        return "FAIL", "YAML: insert mancante o estraneo perso"
+
+    code, out, _ = conn("--apply")                          # idempotente
+    if "=2" not in out:
+        return "FAIL", f"non idempotente: {out.strip().splitlines()[-1][:120]}"
+
+    code, out, _ = conn("--restore", "--apply")            # toglie solo il nostro
+    if "cadcraft" in agents.read_text(encoding="utf-8") or "keepme" not in agents.read_text(encoding="utf-8"):
+        return "FAIL", "restore: il JSON non e' tornato com'era"
+    if "[mcp_servers.cadcraft]" in codex.read_text(encoding="utf-8"):
+        return "FAIL", "restore: il TOML non e' tornato com'era"
+    if "craft-bridge-cadcraft" in dsh.read_text(encoding="utf-8"):
+        return "FAIL", "restore: lo YAML non e' tornato com'era"
+    return "PASS", "JSON, VS Code, TOML e YAML: scritti, idempotenti, restore pulito"
+
+
+@case("report di stato", "static")
+def t_report_status(run: Runner) -> tuple[str, str]:
+    """Il report scrive il JSON e la pagina lo incorpora (senza toccare i report veri)."""
+    out_json, out_html = run.tmp / "status.json", run.tmp / "status.html"
+    code, out, err = run.run(str(HERE / "craft-bridge-report.py"),
+                             "--no-doctor", "--no-clients", "--no-feed",
+                             "--out-json", str(out_json), "--out-html", str(out_html))
+    if code != 0 or not out_json.is_file() or not out_html.is_file():
+        return "FAIL", f"uscita {code}: {(err or out)[-160:]}"
+    data = json.loads(out_json.read_text(encoding="utf-8"))
+    if data.get("schema") != "craft-bridge-status/1" or data.get("config", {}).get("count", 0) < 1:
+        return "FAIL", "json: schema o entry della config mancanti"
+    page = out_html.read_text(encoding="utf-8")
+    for needle in ('id="data"', "bridge-status.json", "Craft Bridge"):
+        if needle not in page:
+            return "FAIL", f"html: manca {needle!r}"
+    if "__DATA__" in page:
+        return "FAIL", "html: il segnaposto dei dati non e' stato riempito"
+    return "PASS", f"json {data['config']['count']} entry, html {len(page)} byte"
+
+
+@case("client MCP nella diagnosi", "static", env=True)
+def t_client_check(run: Runner) -> tuple[str, str]:
+    """`doctor` accusa un client presente senza le entry del ponte, e tace quando le ha.
+
+    Su file di prova con `--client-path` (la config vera di un client non e' una cavia),
+    nelle due direzioni: 0 entry -> FIX con l'azione, 13 entry -> nessun FIX.
+    """
+    root = run.tmp / "cli-check"
+    root.mkdir()
+    empty = root / "mcp.json"
+    empty.write_text(json.dumps({"mcpServers": {"keepme": {"type": "stdio",
+                     "command": "x", "args": [], "env": {}}}}), encoding="utf-8")
+    code, out, _ = run.run(str(HERE / "craft-bridge-doctor.py"), "--no-live",
+                           "--client-path", f"cursor={empty}")
+    if code != 1 or "FIX  client MCP" not in out or "cursor 0/13" not in out or \
+            "craft-bridge-connect.py --apply" not in out:
+        return "FAIL", f"client senza entry non accusato (uscita {code})"
+
+    CONNECT = _load("craft_bridge_connect", "craft-bridge-connect.py")
+    plan = CONNECT.plan(CONFIG.DEFAULT_INSTALL_DIR,
+                        str(Path.home() / ".craft-bridge" / "photocraft.token"),
+                        str(Path.home() / ".craft-bridge" / "pdfcraft-control.json"))
+    filled = root / "mcp-full.json"
+    filled.write_text(json.dumps({"mcpServers":
+                     {s: CONNECT._json_shape("json", e) for s, e in plan.items()}}),
+                      encoding="utf-8")
+    code2, out2, _ = run.run(str(HERE / "craft-bridge-doctor.py"), "--no-live",
+                             "--client-path", f"cursor={filled}")
+    if "FIX" in out2 and "client MCP" in out2:
+        return "FAIL", "accusa un client che ha tutte le entry del ponte"
+    return "PASS", f"accusa cursor 0/13 ({code}) e tace con le 13 ({code2})"
+
+
+@case("report --serve", "static")
+def t_report_serve(run: Runner) -> tuple[str, str]:
+    """`--serve` apre un server locale che serve pagina e JSON: si prova per davvero.
+
+    Su file temporanei (`--out-json`/`--out-html` dentro la cartella della suite), cosi'
+    non tocca i report veri, e senza diagnosi (`--no-doctor`) perche' qui conta il server.
+    """
+    d = run.tmp / "serve"
+    d.mkdir()
+    oj, oh = d / "bridge-status.json", d / "bridge-status.html"
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        port = s.getsockname()[1]
+    proc = subprocess.Popen(
+        [sys.executable, str(HERE / "craft-bridge-report.py"), "--serve", "--no-open",
+         "--no-doctor", "--no-clients", "--no-feed", "--port", str(port),
+         "--out-json", str(oj), "--out-html", str(oh)],
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+    try:
+        if not wait_open(port, 25.0):
+            return "FAIL", "il server di --serve non si e' aperto"
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/bridge-status.html", timeout=5) as r:
+            body = r.read().decode("utf-8", "replace")
+            if r.status != 200 or "Craft Bridge" not in body:
+                return "FAIL", f"la pagina non risponde bene (status {r.status})"
+        with urllib.request.urlopen(f"http://127.0.0.1:{port}/bridge-status.json", timeout=5) as r:
+            if json.loads(r.read().decode("utf-8")).get("schema") != "craft-bridge-status/1":
+                return "FAIL", "il JSON servito non ha lo schema atteso"
+    finally:
+        kill(proc.pid)
+    return "PASS", f"servito su 127.0.0.1:{port}: pagina 200 e JSON con lo schema"
+
+
 ALL = [t_clean, t_stale_install, t_bad_entry, t_broken_path, t_missing_exe,
        t_locations, t_locations_live, t_feed_compare, t_feed_bytes, t_feed_missing,
        t_feed_files, t_gate,
        t_closed_port, t_good_build, t_drift_build, t_wrong_app, t_bad_token,
        t_ui_args, t_ui_session, t_ui_headless, t_ui_live,
-       t_flag_verdict, t_flag_doctor, t_flag_live]
+       t_flag_verdict, t_flag_doctor, t_flag_live,
+       t_connect_clients, t_report_status, t_report_serve, t_client_check]
 
 # Gli strumenti che la suite verifica: le loro impronte finiscono nel report, cosi'
 # due esecuzioni a distanza si confrontano anche su *cosa* e' cambiato.
 FINGERPRINTED = ("craft-bridge-mcp.py", "craft-bridge-ident.py", "craft-bridge-doctor.py",
                  "craft-bridge-config.py", "craft-bridge-feed.py", "craft-bridge-tests.py",
-                 "craft-bridge-ui.py")
+                 "craft-bridge-ui.py", "craft-bridge-connect.py", "craft-bridge-report.py")
 
 
 def tool_hashes() -> dict:
@@ -1541,6 +1699,10 @@ def main() -> int:
                              "`.only-<filtro>.json` con --only; il markdown prende lo stesso "
                              "nome, .md); `--out` come negli altri strumenti del progetto")
     parser.add_argument("--no-report", action="store_true", help="non scrivere niente su disco")
+    parser.add_argument("--no-status", action="store_true",
+                        help="non rigenerare il report di stato (reports/bridge-status.json e "
+                             ".html) a fine esecuzione; di default lo rigenera, cosi' la pagina "
+                             "riflette sempre l'ultima esecuzione")
     parser.add_argument("--compare",
                         help="confronta con un report precedente "
                              "(default: il report stesso, cioe' l'esecuzione precedente)")
@@ -1630,6 +1792,19 @@ def main() -> int:
             md_path.write_text(markdown(report, changes, previous), encoding="utf-8")
         except OSError as exc:
             print(f"[!] report non scritto: {exc}", file=sys.stderr)
+
+    # A fine esecuzione la pagina di stato si rigenera da sola: legge le baseline appena
+    # scritte, quindi mostra l'ultima esecuzione invece di una fotografia vecchia. Non e'
+    # una misura in piu' (chiede a `craft-bridge-report.py`, che a sua volta chiede a
+    # doctor), quindi un suo guasto non fa fallire la suite: lo si dice e basta.
+    if not args.no_report and not args.no_status:
+        proc = subprocess.run([sys.executable, str(HERE / "craft-bridge-report.py")],
+                              capture_output=True, text=True, encoding="utf-8", errors="replace")
+        if proc.returncode != 0:
+            print(f"[!] stato non rigenerato: {(proc.stderr or proc.stdout or '').strip()[-160:]}",
+                  file=sys.stderr)
+        elif not args.json:
+            print("\nstato: reports/bridge-status.json · reports/bridge-status.html")
 
     if args.json:
         print(json.dumps(report, indent=2, ensure_ascii=False))

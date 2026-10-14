@@ -57,6 +57,7 @@ first is *not measured*, the second is *measured and quiet*.
 | `pdfcraft` shows 15 tools (or 161) | the mode of the [translator](../tools/craft-bridge-ui.md): window open → the window's 15 methods, closed → the vendor's headless server |
 | `pdfcraft` does not appear among the entries verified with the mode | the translator is installed but does not answer: `craft-bridge-ui.py --where`, then reopen the app with the control file |
 | `FIX shim installato` | the source is newer than the installed copy: `--apply` (it holds for the PdfCraft translator too) |
+| `FIX client MCP: cursor 0/13` | a client present on the machine does not read the bridge (an entry left headless, or no entry at all): `python craft-bridge-connect.py --apply`, then reload the client (see [Connect a client](connect-a-client.md)) |
 | `FIX flag di aggancio: fintocraft...` | the table declares a flag the CLI help does not name (or the other way round): look at `craft-bridge-mcp.py --flags`, then align the table (see [craft-bridge-mcp](../tools/craft-bridge-mcp.md)) |
 | `nota flag di aggancio: non leggibile per ...` | that CLI prints no help: the flag stays a declaration of the table, not a proof |
 | `nota posizione app: sistema e tabella non concordano` | the path used is the system's: align the table (see [Where the app is](../architecture/app-locations.md)) |

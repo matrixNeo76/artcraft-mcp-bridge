@@ -1,6 +1,6 @@
 # Roadmap
 
-State as of 13 October 2026: the bridge works and is verified (12/12 apps driveable, 13/13
+State as of 13 October 2026: the bridge works and is verified (13/13 apps driveable, 14/14
 entries, 24/24 in the fault suite, diagnosis `tutto in ordine`), the whole suite runs on every
 push to `main` and a case that gets worse than the saved baseline stops the run. What follows is
 what is worth doing next, in order of value for cost.

@@ -4,7 +4,7 @@ title: "Generated reports and comparison between runs"
 description: "Every generated artefact lives in reports/ and that is the tools' default; the suite compares the current run with the saved baseline of the same mode, and a worsening stops the run."
 resource: ../../reports/craft-bridge-tests.json
 tags: [report, baseline, comparison]
-generated: { by: process:freebuff-buffy, at: 2026-10-13T19:55:00Z }
+generated: { by: process:freebuff-buffy, at: 2026-10-14T08:15:00Z }
 status: stable
 sources:
 - resource: ../../tools/craft-bridge-tests.py
@@ -24,12 +24,24 @@ sources:
 | `reports/craft-bridge-tests.only-<filter>.json` (`.md`) | fault suite, `--only` | the same, for one filter (with `--static` and `--ci` the parts add up: `.static.only-x.ci.json`) |
 | `reports/craft-bridge-sweep.json` | sweep | per app: headless tools, bridged tools, app-only names |
 | `reports/mcp-tools-report.md` | report-mcp-tools | inventory of the servers and their tools |
+| `reports/bridge-status.json` | report | the whole state in machine form: verdict, config, clients, baselines, feed, logs |
+| `reports/bridge-status.html` | report | the page that **reads** `bridge-status.json` beside it and shows it |
 | `reports/photocraft-pilot-report.json` | pilot | the steps of the app session and the image artefacts |
 | `reports/photocraft-live-*.png` | pilot | the images captured from the live window |
 | `reports/okf-graph.html` | `uvx okfgen visualize docs` | the bundle as an interactive graph: nodes, relations, types |
 
 The tools write there by **default**, not into the folder you invoke them from: that way
 two runs made from different places stay comparable.
+
+Two of those files, `bridge-status.json` and `bridge-status.html`, are **refreshed by the
+suite at the end of every run** (unless `--no-status` or `--no-report`): they read the
+baselines just written, so the status page is the last execution and not a stale
+photograph. `--serve` on [the report](../tools/craft-bridge-report.md) then shows it.
+
+In CI the same two files are **published as a run artifact** (`bridge-status` from the hosted
+job, `bridge-status-selfhosted` from the machine that has the bridge), so every push leaves a
+downloadable view of the state: the workflow regenerates them with `if: always()` and never
+fails a job over an artifact. See [Continuous integration](../operations/ci.md).
 
 # The comparison
 
@@ -60,3 +72,5 @@ not decide.
 - **produced by** [craft-bridge-tests](../tools/craft-bridge-tests.md)
 - **produced by** [craft-bridge-sweep](../tools/craft-bridge-sweep.md)
 - **produced by** [report-mcp-tools](../tools/report-mcp-tools.md)
+- **produced by** [craft-bridge-report](../tools/craft-bridge-report.md)
+- **published as an artifact by** [Continuous integration](../operations/ci.md)

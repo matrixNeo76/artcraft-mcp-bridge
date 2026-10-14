@@ -11,7 +11,7 @@ reports live outside the bundle, in `tools/`, `install/`, `reports/`.
 # Project
 * [Overview](overview.md) - what the bridge is, the problem it solves, current state
 * [Technical manual](reference/craft-bridge.md) - the long, complete text, with every measurement
-* [Ecosystem analysis](reference/analysis.md) - inventory of the 13 MCP servers and of the environment
+* [Ecosystem analysis](reference/analysis.md) - inventory of the MCP servers and of the environment
 * [Spec](reference/spec.md) - requirements and acceptance criteria
 * [Plan](reference/plan.md) - phases and milestones
 
@@ -34,12 +34,15 @@ reports live outside the bundle, in `tools/`, `install/`, `reports/`.
 * [craft-bridge-verify](tools/craft-bridge-verify.md) - queries every entry with its real command
 * [craft-bridge-sweep](tools/craft-bridge-sweep.md) - measures headless against bridged, app by app
 * [craft-bridge-tests](tools/craft-bridge-tests.md) - the suite that injects faults
+* [craft-bridge-connect](tools/craft-bridge-connect.md) - the bridge in every MCP client, one format each
+* [craft-bridge-report](tools/craft-bridge-report.md) - the whole state in a JSON and an HTML page
 * [Exploratory tools](tools/exploration.md) - recon, probe, pilot
 * [report-mcp-tools](tools/report-mcp-tools.md) - real inventory of the servers' tools
 * [artcraft-mcp-proxy](tools/artcraft-mcp-proxy.md) - conformance shim for the generative MCP
 
 # Operations
 * [Install and repair](operations/install-and-repair.md) - runbook
+* [Connect a client](operations/connect-a-client.md) - the bridge in any MCP client, client by client
 * [Diagnosis and verification](operations/diagnosis.md) - runbook
 * [Safety rules](operations/safety-rules.md) - what is never touched
 * [Continuous integration](operations/ci.md) - what every push checks, and what `--ci` means

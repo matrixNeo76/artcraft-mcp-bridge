@@ -561,7 +561,7 @@ def main() -> int:
         item["channel_log"] = listening_line(item["log"], item["port"]) if (item["channel"] and fresh) else ""
 
     # La riga di log puo' arrivare un istante dopo il listen(): le si da' un margine
-    # (con 11 app avviate insieme il log e' piu' lento della porta).
+    # (con 12 app avviate insieme il log e' piu' lento della porta).
     log_deadline = time.time() + 3.0
     while time.time() < log_deadline:
         waiting = [i for i in plan if i["channel"] and i.get("pid") and not i["channel_log"]]

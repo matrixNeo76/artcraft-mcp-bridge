@@ -4,8 +4,8 @@
 
 [English](README.md) · [Italiano](README.it.md) · [Español](README.es.md) · **中文**
 
-本桥接器把 **Crafting Apps**（CADCraft、DeckCraft、DesignCraft、FilmCraft、GridCraft、LightCraft、
-PdfCraft、PhotoCraft、SoundCraft、VectorCraft、WordCraft、EffectCraft）与 MCP 客户端连接起来：不再退化到
+本桥接器把 **Crafting Apps**（CADCraft、DeckCraft、DesignCraft、EffectCraft、FigCraft、FilmCraft、
+GridCraft、LightCraft、PdfCraft、PhotoCraft、SoundCraft、VectorCraft、WordCraft）与 MCP 客户端连接起来：不再退化到
 没有界面的 CLI，而是通过应用自身的**控制通道**驱动正在运行的应用，使工具直接作用于已打开的窗口。
 
 ## 问题
@@ -56,19 +56,39 @@ python tools/craft-bridge-verify.py
 
 恢复为 headless：`python tools/craft-bridge-config.py --restore`。
 
+## 其他 MCP 客户端
+
+Freebuff 不是唯一的客户端。一条命令就能把同一个桥接器写入你已有的其它客户端 —— Claude Desktop、Claude Code、Cursor、Windsurf、VS Code、Cline、LM Studio、Zed、Codex（ChatGPT 桌面版）以及 DeepSeek Harness（`dsh`）—— 每个都有各自的文件与格式，来自同一来源，不碰不属于我们的内容：
+
+```bash
+python tools/craft-bridge-connect.py --list     # 哪些客户端在这里，它们从哪里读取
+python tools/craft-bridge-connect.py            # 试运行：会改动什么
+python tools/craft-bridge-connect.py --apply    # 写入，并先备份
+```
+
+逐客户端的做法（包括两个非 JSON 的）见 [docs/operations/connect-a-client.md](docs/operations/connect-a-client.md)。
+
+想一眼看清整体状态 —— 结论、条目、客户端、基线、feed、日志 —— 看一个 JSON 和读取它的页面：
+
+```bash
+python tools/craft-bridge-report.py             # reports/bridge-status.json + .html
+python tools/craft-bridge-report.py --serve     # 另起本地服务器并打开页面（Ctrl+C 停止）
+```
+
 ## 已验证状态（2026 年 10 月 13 日）
 
 | 验证项 | 结果 |
 |---|---|
-| 能在窗口上成功调用并可被驱动的应用 | 12/12（11 个通过 shim 进入 bridged，PdfCraft 通过翻译） |
-| 用真实命令执行配置条目 | 13/13 |
-| 故障测试套件（24 个用例，注入故障） | 23/23 已执行，1 个带原因跳过（PdfCraft 窗口已关闭），连续两轮结果一致 |
-| 已安装版本与启动器发布的版本对比 | 12/12 一致（10 月 13 日的 feed） |
-| 已安装 CLI 与已发布 CLI 的字节对比 | 11 个中试了 1 个：SoundCraft 完全一致（`sha256 915ee3abb121…`）；其余应用磁盘上没有压缩包 |
-| 应用与 CLI 的路径 | 11/11 来自 `App Paths` 注册表（表格只作确认，不作决定） |
+| 能在窗口上成功调用并可被驱动的应用 | 13/13（12 个通过 shim 进入 bridged——含 `figcraft`——，PdfCraft 通过翻译） |
+| 用真实命令执行配置条目 | 14/14 |
+| 故障测试套件（28 个用例，注入故障） | 在 PdfCraft 窗口关闭时 27 个执行 + 1 个跳过（唯一的实时用例会说明原因），`--static` 下 23+1，连续两轮结果一致 |
+| 已注册桥接器的客户端 | 已知 13 个，本机存在 4 个；`--apply` 后全部为 **13/13**（此前：`agents` 13，`claude-desktop` 与 `antigravity` 为 **12** 条 headless 条目，`windsurf` 为 **0**） |
+| 已安装版本与启动器发布的版本对比 | 13 个中对比了 12 个（10 月 13 日的 feed）：feed 尚未列出 `figcraft`，因此对它没有可比对象，诊断会如实说明 |
+| 已安装 CLI 与已发布 CLI 的字节对比 | 12 个中试了 1 个：SoundCraft 完全一致（`sha256 915ee3abb121…`）；其余应用磁盘上没有压缩包 |
+| 应用与 CLI 的路径 | 12/12 来自 `App Paths` 注册表（表格只作确认，不作决定） |
 | PdfCraft 窗口的方法 | 15/15 与应用声明的完全一致；192 个命令、107 个控件、窗口截图 |
-| 表格声明的挂接标志 | 12/12 得到 CLI help 的确认（11 个 `--connect`/`--bridge` 挂接，PdfCraft 无标志且使用 `--control`） |
-| 各服务器的工具清单 | 13/13 服务器，618 个工具（`pdfcraft`：窗口的 15 个方法） |
+| 表格声明的挂接标志 | 13/13 得到 CLI help 的确认（11 个 `--connect`/`--bridge` 和 1 个 `--attach` 挂接，PdfCraft 无标志且使用 `--control`） |
+| 各服务器的工具清单 | 14/14 服务器，636 个工具（`pdfcraft`：窗口的 15 个方法；`figcraft`：18） |
 | 整体诊断 | `tutto in ordine` |
 
 ## 文档
@@ -78,11 +98,11 @@ python tools/craft-bridge-verify.py
 [docs/reference/craft-bridge.md](docs/reference/craft-bridge.md)（英文）。
 
 ```bash
-uvx okfgen validate docs --strict                      # 符合规范：32 个概念，0 个错误
+uvx okfgen validate docs --strict                      # 符合规范：35 个概念，0 个错误
 uvx okfgen visualize docs -o reports/okf-graph.html    # 生成该包的可交互图
 ```
 
-生成的图位于 [reports/okf-graph.html](reports/okf-graph.html)：32 个节点，162 条关系。
+生成的图位于 [reports/okf-graph.html](reports/okf-graph.html)：35 个节点，182 条关系。
 
 ## 已安装的版本 vs 已发布的版本
 

@@ -81,18 +81,24 @@ tools/list → 61 tool
 | VectorCraft | storytold/vectorcraft | v0.10.0 |
 | WordCraft | storytold/wordcraft | v0.6.1 |
 
-> Note: the website also lists **FigCraft**; it does not appear in the local launcher feed
-> (verified: exactly 13 entries).
+> Note: the website also lists **FigCraft**, and it **is** installed here, but it does not
+> appear in the local launcher feed (verified: exactly 13 entries, and `figcraft` is not one
+> of them). The launcher's `releases.json` names its repository (`storytold/figcraft`); the
+> feed that lists what to install does not include it yet, so the bridge's comparison with
+> the published release reports it as *absent* instead of aligned. The bridge serves it all
+> the same — see [the manual](craft-bridge.md) §6.2.
 
-### 3.3 Actual state of the suite — ALL 12 APPS INSTALLED
+### 3.3 Actual state of the suite — ALL 13 APPS INSTALLED
 
 > **⚠️ Correction (13 Oct 2026, after verification).** A first reconnaissance concluded "no app
 > installed": that was **wrong**. I was only looking in `%LOCALAPPDATA%\Programs`, whereas the
 > Crafting Apps are installed **machine-wide in `C:\Program Files\<App>\`**. Correct check:
 
 Windows registry (`Uninstall`): `CADCraft 0.6.2`, `DeckCraft 0.6.1`, `DesignCraft 0.7.1`,
-`EffectCraft 0.9.2`, `FilmCraft 0.7.2`, `GridCraft 0.6.1`, `LightCraft 0.7.1`, `PdfCraft 0.7.1`,
-`PhotoCraft 0.8.2`, `SoundCraft 0.6.1`, `VectorCraft 0.10.0`, `WordCraft 0.6.1`.
+`EffectCraft 0.9.2`, `FigCraft 0.5.1`, `FilmCraft 0.7.2`, `GridCraft 0.6.1`, `LightCraft 0.7.1`,
+`PdfCraft 0.7.1`, `PhotoCraft 0.8.2`, `SoundCraft 0.6.1`, `VectorCraft 0.10.0`, `WordCraft 0.6.1`
+(13 apps; `FigCraft` was installed later than the first reconnaissance and is the newest of
+the suite).
 
 Every app installs **two executables** in `C:\Program Files\<App>\`:
 

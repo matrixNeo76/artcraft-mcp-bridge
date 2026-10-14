@@ -82,6 +82,8 @@ APPS: dict[str, dict] = {
                     "flag": "--connect", "addr": "{port}", "port": 7973},
     "effectcraft": {"cli": r"C:\Program Files\EffectCraft\effectcraft-cli.exe",
                     "flag": "--bridge", "addr": "{port}", "port": 9877},
+    "figcraft":    {"cli": r"C:\Program Files\FigCraft\figcraft-cli.exe",
+                    "flag": "--attach", "addr": "{port}", "port": 7981},
     "filmcraft":   {"cli": r"C:\Program Files\FilmCraft\filmcraft-cli.exe",
                     "flag": "--bridge", "addr": "127.0.0.1:{port}", "port": 7974},
     "gridcraft":   {"cli": r"C:\Program Files\GridCraft\gridcraft-cli.exe",
@@ -120,7 +122,7 @@ APP_PATHS = r"SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths"
 
 
 # I nomi dei file di ogni app, in un posto solo: la CLI e l'app hanno lo stesso nome
-# di base, e questo vale per tutte e undici (verificato).
+# di base, e questo vale per tutte e dodici (verificato).
 def cli_beside(app_exe: str) -> Path:
     return Path(app_exe).with_name(Path(app_exe).stem + "-cli.exe")
 
@@ -204,14 +206,16 @@ def app_table() -> dict:
 # Il flag di aggancio: quello che la tabella dichiara, e quello che la CLI dice di se'
 # ---------------------------------------------------------------------------------
 #
-# La tabella dice **quale flag** serve per guidare la finestra (`--connect` o
-# `--bridge`), e per le app servite dal traduttore dice che un flag non c'e' affatto.
+# La tabella dice **quale flag** serve per guidare la finestra (`--connect`, `--bridge`
+# o `--attach`), e per le app servite dal traduttore dice che un flag non c'e' affatto.
 # E' una dichiarazione, e invecchia come tutte: un'app aggiornata che rinomina o toglie
 # l'opzione lascerebbe la tabella a promettere qualcosa che non esiste, e il guasto
 # arriverebbe all'avvio del connettore, lontano da qui. Quindi la stessa domanda si fa
 # alla CLI, nel suo help: e' **la sua** interfaccia, non la nostra memoria.
 
-BRIDGE_FLAGS = ("--connect", "--bridge")
+# I flag di aggancio visti finora. `--attach` e' quello di FigCraft: prende la sola
+# porta ("--attach needs a port number"), mentre gli altri vogliono un indirizzo.
+BRIDGE_FLAGS = ("--connect", "--bridge", "--attach")
 
 
 def cli_help(cli: str, timeout: float = 20.0) -> dict:

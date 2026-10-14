@@ -192,8 +192,9 @@ portability is needed, use the `dsh-config-manager` plugin (import/backup).
 
 ## 8. Scope B (implemented) — Crafting Apps
 
-The 12 Crafting Apps are installed in `C:\Program Files\<App>\`, each with `<app>-cli.exe`
-exposing the `mcp` subcommand. The spec for scope B is therefore:
+The Crafting Apps are installed in `C:\Program Files\<App>\`, each with `<app>-cli.exe`
+exposing the `mcp` subcommand (12 at the time of this spec; **13** now, `figcraft` having
+joined later). The spec for scope B is therefore:
 
 ```json
 {
@@ -209,8 +210,8 @@ exposing the `mcp` subcommand. The spec for scope B is therefore:
 
 Rules applied:
 - **one entry per app**, with `args: ["mcp"]` and an **absolute path** (the CLIs are not on the PATH);
-- naming: `cadcraft`, `deckcraft`, `designcraft`, `effectcraft`, `filmcraft`, `gridcraft`,
-  `lightcraft`, `pdfcraft`, `photocraft`, `soundcraft`, `vectorcraft`, `wordcraft`;
+- naming: `cadcraft`, `deckcraft`, `designcraft`, `effectcraft`, `figcraft`, `filmcraft`,
+  `gridcraft`, `lightcraft`, `pdfcraft`, `photocraft`, `soundcraft`, `vectorcraft`, `wordcraft`;
 - automatic discovery: the entry is created **only if** `<App>\<app>-cli.exe` exists;
 - no credential required (local engine).
 

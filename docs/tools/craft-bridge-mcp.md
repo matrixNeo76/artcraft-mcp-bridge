@@ -60,8 +60,9 @@ The full rule and the reasoning are in [Where the app is](../architecture/app-lo
 
 # The attach flag, asked of the CLI
 
-The bridge **flag** is a declaration too: the table says `--connect` or `--bridge`, and for
-the app served by the translator it says there is no flag at all. It is what the bridge
+The bridge **flag** is a declaration too: the table says `--connect`, `--bridge` or
+`--attach` (FigCraft's CLI takes the last one, and a bare port), and for the app served by
+the translator it says there is no flag at all. It is what the bridge
 executes at every start (`<cli> mcp --connect PORT`), so it is worth asking the party
 concerned instead of remembering it: `--flags` launches each CLI's `--help` and compares.
 
@@ -83,7 +84,8 @@ connection. Two consequences, stated rather than hidden:
 
 This is why the verdict is one diagnosis line and not a proof of operation: the proof that
 the bridge works remains a successful call on the window. Measured on 13 October 2026:
-**11/11** CLIs document the declared flag (seven `--connect`, four `--bridge`), and
+**12/12** CLIs document the declared flag (eight `--connect`, three `--bridge`, one
+`--attach` - FigCraft), and
 `pdfcraft` names neither but documents `ui --control FILE` - that is, the same thing the
 table claims, and the reason its window goes through the
 [translator](craft-bridge-ui.md) instead of an attach. The complete verdict is a line of
