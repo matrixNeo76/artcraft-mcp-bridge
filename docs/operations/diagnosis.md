@@ -21,7 +21,7 @@ sources:
 |---|---|---|
 | `python tools/craft-bridge-doctor.py` | is the assembly healthy? which actions are needed? | ~2.4 s (apps closed) |
 | `python tools/craft-bridge-verify.py` | does every entry in the config really answer? | tens of seconds |
-| `python tools/craft-bridge-tests.py` | do the tools see the faults when there are any, and has anything got worse than the baseline? | ~76 s (~36 s with `--static`, 20 of the 24 cases) |
+| `python tools/craft-bridge-tests.py` | do the tools see the faults when there are any, and has anything got worse than the baseline? | ~76 s (~36 s with `--static`, 24 of the 28 cases) |
 | `python tools/craft-bridge-feed.py` | is the installed app the one the launcher publishes? | ~0.9 s |
 
 # Recommended order

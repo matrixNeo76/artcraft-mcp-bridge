@@ -4,7 +4,7 @@ title: "craft-bridge-tests - the suite that injects faults"
 description: "Twenty-eight cases that break something on purpose and demand the right verdict from shim, translator, doctor, ident, launcher and the multi-client connector; every run leaves a report compared with the saved baseline, refreshes the status page and, when a case gets worse, stops the run with its own exit code."
 resource: ../../tools/craft-bridge-tests.py
 tags: [tool, tests, faults, report]
-generated: { by: process:freebuff-buffy, at: 2026-10-13T19:55:00Z }
+generated: { by: process:freebuff-buffy, at: 2026-10-14T09:20:00Z }
 status: stable
 sources:
 - resource: ../../tools/craft-bridge-tests.py
@@ -75,10 +75,11 @@ copies, the cases that talk about the bridge are **skipped with the reason** ins
 failing. A real fault stays a FAIL: the mode changes what an absent environment is, not
 what a fault is. The three proofs, all run before publishing it:
 
-1. on a machine with the bridge, `--static --ci` gives **20/20 and no skips** (and 24/24 on
-   the whole suite);
-2. on a machine with no bridge (this repo's checkout, empty environment), it gives
-   **11 passed + 8 skipped** and exits 0;
+1. on a machine with the bridge and the PdfCraft window closed (the state CI runs in),
+   `--static` gives **23 passed + 1 skipped** and the whole suite **27 passed + 1 skipped**;
+   the skip is the declared one: the live window case, the only one that needs a window;
+2. on the GitHub runner (empty environment: no config, no installed copies) it gives
+   **14 passed + 10 skipped** and exits 0, with the reason on every skip;
 3. with a real fault injected - one extra byte in the installed copy of the translator -
    the same command gives **FAIL** and exits 1 even with `--ci`, so the mode does not hide
    faults, it only stops calling the absence of a bridge a fault.
