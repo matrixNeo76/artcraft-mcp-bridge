@@ -4,7 +4,7 @@ title: "craft-bridge-tests - the suite that injects faults"
 description: "Twenty-eight cases that break something on purpose and demand the right verdict from shim, translator, doctor, ident, launcher and the multi-client connector; every run leaves a report compared with the saved baseline, refreshes the status page and, when a case gets worse, stops the run with its own exit code."
 resource: ../../tools/craft-bridge-tests.py
 tags: [tool, tests, faults, report]
-generated: { by: process:freebuff-buffy, at: 2026-10-14T09:20:00Z }
+generated: { by: process:freebuff-buffy, at: 2026-10-14T10:40:00Z }
 status: stable
 sources:
 - resource: ../../tools/craft-bridge-tests.py
@@ -60,7 +60,7 @@ really needs nothing, because there the fake CLI **is** the headless server.
 
 ```
 python tools/craft-bridge-tests.py                 # everything (~160 s, starts real apps)
-python tools/craft-bridge-tests.py --static        # only the cases without apps (~80 s, 24 of 28)
+python tools/craft-bridge-tests.py --static        # only the cases without apps (~80 s, 25 of 29)
 python tools/craft-bridge-tests.py --only build --json
 python tools/craft-bridge-tests.py --report reports/my.json --compare old.json
 python tools/craft-bridge-tests.py --static --ci   # on a runner without an installed bridge
@@ -76,10 +76,10 @@ failing. A real fault stays a FAIL: the mode changes what an absent environment 
 what a fault is. The three proofs, all run before publishing it:
 
 1. on a machine with the bridge and the PdfCraft window closed (the state CI runs in),
-   `--static` gives **23 passed + 1 skipped** and the whole suite **27 passed + 1 skipped**;
+   `--static` gives **24 passed + 1 skipped** and the whole suite **28 passed + 1 skipped**;
    the skip is the declared one: the live window case, the only one that needs a window;
 2. on the GitHub runner (empty environment: no config, no installed copies) it gives
-   **14 passed + 10 skipped** and exits 0, with the reason on every skip;
+   **15 passed + 10 skipped** and exits 0, with the reason on every skip;
 3. with a real fault injected - one extra byte in the installed copy of the translator -
    the same command gives **FAIL** and exits 1 even with `--ci`, so the mode does not hide
    faults, it only stops calling the absence of a bridge a fault.

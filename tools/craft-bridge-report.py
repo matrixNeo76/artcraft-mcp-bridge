@@ -116,7 +116,7 @@ def clients(entries_config: dict | None) -> list[dict]:
         path = c["path"]
         row = {"id": c["id"], "title": c["title"], "kind": c["kind"],
                "path": str(path) if path else None,
-               "present": bool(path and path.parent.is_dir())}
+               "present": CONNECT.client_present(c, path)}
         if row["present"]:
             have = CONNECT.bridge_slugs(c, path, expected)
             row["bridge_entries"] = None if have is None else len(have)

@@ -4,7 +4,7 @@ title: "craft-bridge-report - the whole state in one JSON and one HTML page"
 description: "Collects the doctor verdict, the config entries, the MCP clients found, the last suite baseline, the feed comparison and the tail of the launch logs into reports/bridge-status.json and the page reports/bridge-status.html that reads it."
 resource: ../../tools/craft-bridge-report.py
 tags: [tool, report, visualization]
-generated: { by: process:freebuff-buffy, at: 2026-10-14T09:10:00Z }
+generated: { by: process:freebuff-buffy, at: 2026-10-14T10:40:00Z }
 status: stable
 sources:
 - resource: ../../tools/craft-bridge-report.py
@@ -81,12 +81,14 @@ serve.
 
 # Measured
 
-On this machine (14 October) the generated JSON carried 14 config entries, 13 known
-clients of which **4 present**, both suite baselines and 13 launch logs; the page was
+On this machine (14 October) the generated JSON carried 14 config entries, **14 known
+clients of which 7 present**, both suite baselines and 13 launch logs; the page was
 opened served by a local server, verdict `tutto in ordine`. Before the clients were
 registered the table showed `claude-desktop` and `antigravity` at **12 of 13** and
-`windsurf` at **0** — the gap `craft-bridge-connect` closes; after `--apply` all four
-read **13/13, 0 missing**. The suite case `report di stato` reads the JSON (schema and
+`windsurf` at **0** — the gap `craft-bridge-connect` closes; after `--apply` all seven
+read **13/13, 0 missing** (`agents`, `claude-desktop`, `claude-code`, `cursor`, `windsurf`,
+`antigravity`, `vscode-editor`). `claude-code` is the one whose entries are counted from
+its own file: before the reading existed it was not even in the table as present. The suite case `report di stato` reads the JSON (schema and
 entries) and checks the page fills its data placeholder. `--serve` is proven for real by the
 case `report --serve`: on temporary files, it starts the server, waits for the port, GETs the
 page (200, and `Craft Bridge` in it) and the JSON (the expected schema), then stops it.

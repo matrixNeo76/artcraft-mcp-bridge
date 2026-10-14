@@ -4,7 +4,7 @@ title: "craft-bridge-connect - the bridge in every MCP client, not only one"
 description: "Registers the same bridge entries into every MCP client found on the machine (Freebuff, Claude Desktop, Claude Code, Cursor, Windsurf, VS Code, Cline, LM Studio, Zed, Codex, dsh), each in its own format, from a single source and with a dry-run by default."
 resource: ../../tools/craft-bridge-connect.py
 tags: [tool, installation, clients]
-generated: { by: process:freebuff-buffy, at: 2026-10-14T00:00:00Z }
+generated: { by: process:freebuff-buffy, at: 2026-10-14T10:40:00Z }
 status: stable
 sources:
 - resource: ../../tools/craft-bridge-connect.py
@@ -33,11 +33,12 @@ diverge — and deposits them, client by client. It never duplicates the app tab
 |---|---|---|
 | `agents` | `~/.agents/mcp.json` | JSON `mcpServers` |
 | `claude-desktop` | `%APPDATA%\Claude\claude_desktop_config.json` | JSON `mcpServers` |
-| `claude-code` | via `claude mcp add --scope user` | CLI, not a file |
+| `claude-code` | via `claude mcp add --scope user`, read from `~/.claude.json` | CLI writes, the file is read |
 | `cursor` | `~/.cursor/mcp.json` | JSON `mcpServers` |
 | `windsurf` | `~/.codeium/windsurf/mcp_config.json` | JSON `mcpServers` |
 | `antigravity` | `~/.gemini/config/mcp_config.json` | JSON `mcpServers` |
-| `vscode` | `~/.copilot/mcp-config.json` | JSON `mcpServers` |
+| `vscode` (Copilot CLI) | `~/.copilot/mcp-config.json` | JSON `mcpServers` |
+| `vscode-editor` | `%APPDATA%\Code\User\mcp.json` | JSON `servers` |
 | `vscode-workspace` | `<project>/.vscode/mcp.json` | JSON `servers` |
 | `cline` | `~/.cline/data/settings/cline_mcp_settings.json` | JSON `mcpServers` |
 | `lmstudio` | `~/.lmstudio/mcp.json` | JSON `mcpServers` |
@@ -48,6 +49,25 @@ diverge — and deposits them, client by client. It never duplicates the app tab
 The paths are **declared by each client's documentation**, not invented; a client that
 moves is corrected with `--client-path <id>=<file>` without touching the code. The
 `.vscode/mcp.json` file is per project, so it has no default path: you pass it.
+
+Two rows are there because the same product writes two different files: the VS Code
+**editor** reads `%APPDATA%\Code\User\mcp.json` with the key `servers`, while its
+**Copilot CLI** reads `~/.copilot/mcp-config.json` with `mcpServers`. They were one row
+(`vscode`), and the editor — the one most people have — stayed uncovered.
+
+`claude-code` is the only client whose config is **written** through a CLI and **read**
+from its file: writing there is a documented operation of that client, but counting the
+entries from its own output would mean parsing a print made for people.
+
+# A refusal is said
+
+A client that refused a write is printed with its slugs (`rifiutate (12): ...`) and makes
+the exit code 1. It was not always so, and it cost: `claude mcp list` prints
+`cadcraft: C:\...\cadcraft-cli.exe mcp - ✔ Connected`, the first parsing looked for lines
+made only of `name:` and therefore read **zero** servers, the connector tried to *add*
+entries that already existed, the CLI answered `already exists in user config`, 12 entries
+out of 13 stayed headless — and the summary said `invariato`. A fault that only counting
+finds, which is why the count is now printed.
 
 # Interface
 
@@ -82,19 +102,31 @@ python tools/craft-bridge-connect.py --json
 
 # Measured
 
-On this machine (14 October): 13 clients known, **4 present** (`agents`,
-`claude-desktop`, `windsurf`, `antigravity`). In dry-run `agents` was already
-consistent (13 entries, the config `--apply` had written), while `claude-desktop` and
-`antigravity` had **12 of 13** — written by the PowerShell installer as **headless**
-entries — and `windsurf` had **0**. That is the point: three clients were reading the
-vendor CLI, the bridge was in one. **Applied** (`--apply` on the three): all four are
-now at **13/13**, with the foreign servers intact (`artcraft` in Claude Desktop and
-Antigravity, `notebooklm` in Antigravity), a `.bak-<stamp>` beside each file that
-existed, and the entries proven startable: `--config <client file>` run through
+On this machine (14 October): **14 clients known, 7 present** (`agents`, `claude-desktop`,
+`claude-code`, `cursor`, `windsurf`, `antigravity`, `vscode-editor`) — all at **13/13**,
+0 missing. In the first dry-run `agents` was already consistent (13 entries, the config
+`--apply` had written), while `claude-desktop` and `antigravity` had **12 of 13** — written
+by the PowerShell installer as **headless** entries — and `windsurf` had **0**. That is the
+point: three clients were reading the vendor CLI, the bridge was in one. **Applied**: the
+foreign servers stayed intact (`artcraft` in Claude Desktop and Antigravity, `notebooklm`
+in Antigravity), a `.bak-<stamp>` sits beside every file that already existed, and the
+entries are proven startable: `--config <client file>` run through
 [craft-bridge-verify](craft-bridge-verify.md) answers for `cadcraft`, `figcraft` and
-`pdfcraft` with the shim's own mode line. The suite proves the four shapes end to end
-(`client MCP multipli`): written, idempotent on a second run, and `--restore` leaves
-only the foreign server behind.
+`pdfcraft` with the shim's own mode line.
+
+The last two came from the same question — *can the missing clients be done from here?* —
+and they were both real:
+
+| Client | Before | What it took |
+|---|---|---|
+| `claude-code` | 12 of 13, **headless** (`cadcraft-cli.exe mcp`), `figcraft` missing | reading its file, then `--apply`: 12 replaced, 1 added |
+| `cursor` | nothing at all, and no `~/.cursor` folder | creating the folder (the app was installed), then `--apply` |
+| `vscode-editor` | the row did not exist | a row in the table, then `--apply` |
+
+The suite proves the shapes end to end (`client MCP multipli`) and, for `claude-code`,
+`client Claude Code dal file`: a temporary file with headless entries counts **0** of the
+bridge's, the same file with the bridge's entries counts all of them, and a file that is
+not there gives no set at all instead of accusing.
 
 # Exit codes
 

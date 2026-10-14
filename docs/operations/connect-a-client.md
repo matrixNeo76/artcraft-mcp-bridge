@@ -1,10 +1,10 @@
 ---
 type: Runbook
 title: "Connect any MCP client to the bridge"
-description: "One recipe for every MCP client - Freebuff, Claude Desktop, Claude Code, Cursor, Windsurf, VS Code, Cline, LM Studio, Zed, Codex (ChatGPT desktop) and DeepSeek Harness (dsh) - and the two things that make it work: the shim installed, and one entry per app pointing at it."
+description: "One recipe for every MCP client - Freebuff, Claude Desktop, Claude Code, Cursor, Windsurf, VS Code (editor and Copilot CLI), Cline, LM Studio, Zed, Codex (ChatGPT desktop) and DeepSeek Harness (dsh) - plus what can be done for a client that is not installed yet."
 resource: ../../tools/craft-bridge-connect.py
 tags: [runbook, installation, clients, mcp]
-generated: { by: process:freebuff-buffy, at: 2026-10-14T00:00:00Z }
+generated: { by: process:freebuff-buffy, at: 2026-10-14T10:40:00Z }
 status: stable
 sources:
 - resource: ../../tools/craft-bridge-connect.py
@@ -53,10 +53,11 @@ gets a backup beside it.
 |---|---|---|
 | **Freebuff / `.agents`** | `~/.agents/mcp.json` | JSON `mcpServers` (also by `craft-bridge-config.py --apply`) |
 | **Claude Desktop** | `%APPDATA%\Claude\claude_desktop_config.json` | JSON `mcpServers` |
-| **Claude Code** | `~/.claude.json` (user scope) | via `claude mcp add --scope user <slug> -- <cmd> <args>` |
+| **Claude Code** | `~/.claude.json` (user scope) | via `claude mcp add --scope user <slug> -- <cmd> <args>`; the file is **read** to count |
 | **Cursor** | `~/.cursor/mcp.json` | JSON `mcpServers` |
 | **Windsurf / Cascade** | `~/.codeium/windsurf/mcp_config.json` | JSON `mcpServers` |
-| **VS Code / Copilot** | `~/.copilot/mcp-config.json` | JSON `mcpServers` |
+| **VS Code (editor, user)** | `%APPDATA%\Code\User\mcp.json` | JSON `servers` (open it with **MCP: Open User Configuration**) |
+| **VS Code / Copilot CLI** | `~/.copilot/mcp-config.json` | JSON `mcpServers` (a different file and key) |
 | **VS Code (workspace)** | `<project>/.vscode/mcp.json` | JSON `servers` (different key) |
 | **Cline** | `~/.cline/data/settings/cline_mcp_settings.json` | JSON `mcpServers` |
 | **LM Studio** | `~/.lmstudio/mcp.json` | JSON `mcpServers` |
@@ -67,6 +68,27 @@ gets a backup beside it.
 The exact path is `--list`'s answer for a given machine; the table is the default. If a
 client moved, or you want the project-scoped VS Code file, pass
 `--client-path <id>=<file>` — the tool never guesses a path by hand.
+
+# A client that is not installed yet
+
+The tool writes only where the client's **folder** exists, and says `client non
+installato (cartella assente)` for the others: a config written into a folder no app
+ever reads is a promise nobody keeps. What it does not do, and cannot do, is *prove* that
+an app which is not there would read the file.
+
+From here the two halves are separable, and both were done for real on the machine this
+was written on:
+
+| Situation | What is needed |
+|---|---|
+| The app is installed, the folder is not there yet (Cursor) | create the folder (`mkdir ~/.cursor`), then `--apply`: the client finds the entry at its first start |
+| The app is not installed at all (Cline, LM Studio, Zed, Codex, dsh) | the file can be written anyway, but only that app can confirm it reads it; some apps rewrite their config on first run |
+| The app is there and configured, but through the **vendor** CLI (`cadcraft-cli.exe mcp`) | `--apply`: the entry is replaced (remove + add), and the `client MCP` check stops passing in silence |
+
+No client in the table needs a *framework* to be configured: for all of them the config
+is a file the app reads at startup. The exception is Claude Code, where writing is a
+documented operation of its own CLI — and that CLI is the one thing that has to be
+installed for it.
 
 # The two clients that are not JSON
 

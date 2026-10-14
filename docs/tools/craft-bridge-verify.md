@@ -4,7 +4,7 @@ title: "craft-bridge-verify - every entry with its real command"
 description: "Reads the config and queries every entry by running exactly the command written there - shim included - and reports the mode, the available tools and the outcome of a call."
 resource: ../../tools/craft-bridge-verify.py
 tags: [tool, verification, entries]
-generated: { by: process:freebuff-buffy, at: 2026-10-13T14:26:01Z }
+generated: { by: process:freebuff-buffy, at: 2026-10-14T10:40:00Z }
 status: stable
 sources:
 - resource: ../../tools/craft-bridge-verify.py
@@ -42,12 +42,20 @@ python tools/craft-bridge-verify.py --skip soundcraft
 python tools/craft-bridge-verify.py --tool ui_screenshot --tool-args '{"max_side":512}'
 ```
 
+`--config FILE` reads the file the way the **client** writes it: `mcpServers` for most,
+`servers` for VS Code (editor and workspace). So the entries of a client file can be
+proven, not only those of `~/.agents/mcp.json`: measured on `cadcraft`, `figcraft` and
+`pdfcraft` taken from the Cursor file, from `%APPDATA%\Code\User\mcp.json` and from
+`~/.claude.json` — 3/3, 3/3 and 2/2 `OK`, all through the bridge. A file with neither key
+says which keys it has, instead of dying with a `KeyError`.
+
 # Exit codes
 
 | Exit | Meaning |
 |---|---|
 | 0 | every verified entry answered |
 | 1 | at least one entry does not answer or is not in the expected mode |
+| 3 | the config cannot be read, or it holds no `mcpServers`/`servers` key |
 
 # Relations
 

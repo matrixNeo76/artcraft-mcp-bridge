@@ -81,8 +81,8 @@ python tools/craft-bridge-report.py --serve     # 另起本地服务器并打开
 |---|---|
 | 能在窗口上成功调用并可被驱动的应用 | 13/13（12 个通过 shim 进入 bridged——含 `figcraft`——，PdfCraft 通过翻译） |
 | 用真实命令执行配置条目 | 14/14 |
-| 故障测试套件（28 个用例，注入故障） | 在 PdfCraft 窗口关闭时 27 个执行 + 1 个跳过（唯一的实时用例会说明原因），`--static` 下 23+1，连续两轮结果一致 |
-| 已注册桥接器的客户端 | 已知 13 个，本机存在 4 个；`--apply` 后全部为 **13/13**（此前：`agents` 13，`claude-desktop` 与 `antigravity` 为 **12** 条 headless 条目，`windsurf` 为 **0**） |
+| 故障测试套件（29 个用例，注入故障） | 在 PdfCraft 窗口关闭时 28 个执行 + 1 个跳过（唯一的实时用例会说明原因），`--static` 下 24+1，连续两轮结果一致 |
+| 已注册桥接器的客户端 | 已知 14 个，本机存在 7 个，全部为 **13/13**（此前：`agents` 13，`claude-desktop`、`antigravity` 与 `claude-code` 为 **12** 条 headless 条目，`windsurf` 为 **0**，`cursor` 与 VS Code 编辑器尚未配置） |
 | 已安装版本与启动器发布的版本对比 | 13 个中对比了 12 个（10 月 13 日的 feed）：feed 尚未列出 `figcraft`，因此对它没有可比对象，诊断会如实说明 |
 | 已安装 CLI 与已发布 CLI 的字节对比 | 12 个中试了 1 个：SoundCraft 完全一致（`sha256 915ee3abb121…`）；其余应用磁盘上没有压缩包 |
 | 应用与 CLI 的路径 | 12/12 来自 `App Paths` 注册表（表格只作确认，不作决定） |

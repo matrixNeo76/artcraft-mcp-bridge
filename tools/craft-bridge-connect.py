@@ -3,7 +3,7 @@
 
 `craft-bridge-config.py` scrive **una** config (`~/.agents/mcp.json`), quella che
 Freebuff e gli agenti `.agents` leggono. Ma lo stesso shim lo possono vedere anche
-Claude Desktop, Claude Code, Cursor, Windsurf, VS Code/Copilot, Cline, LM Studio,
+Claude Desktop, Claude Code, Cursor, Windsurf, VS Code (e la sua CLI Copilot), Cline, LM Studio,
 Zed, Codex (ChatGPT desktop) e DeepSeek Harness (`dsh`): ognuno con il **suo** file,
 in formati diversi (JSON `mcpServers`, JSON `servers`, JSON `context_servers`
 annidato, TOML, YAML di patch). Riscriverli a mano, per ogni client, e' il punto in
@@ -35,12 +35,13 @@ senza toccare il codice.
 
     agents          ~/.agents/mcp.json                          (Freebuff e agenti .agents)
     claude-desktop  %APPDATA%/Claude/claude_desktop_config.json
-    claude-code     via CLI `claude mcp add --scope user`
+    claude-code     via CLI `claude mcp add --scope user`       (~/.claude.json, scope utente)
     cursor          ~/.cursor/mcp.json
     windsurf        ~/.codeium/windsurf/mcp_config.json
     antigravity     ~/.gemini/config/mcp_config.json
-    vscode          ~/.copilot/mcp-config.json                  (Copilot, utente)
-    vscode-workspace  <progetto>/.vscode/mcp.json               (chiave `servers`, per-utente)
+    vscode          ~/.copilot/mcp-config.json                  (Copilot CLI, utente)
+    vscode-editor   %APPDATA%/Code/User/mcp.json                (l'editor: chiave `servers`)
+    vscode-workspace  <progetto>/.vscode/mcp.json               (chiave `servers`, per-progetto)
     cline           ~/.cline/data/settings/cline_mcp_settings.json
     lmstudio        ~/.lmstudio/mcp.json
     zed             %APPDATA%/Zed/settings.json                 (chiave `context_servers`)
@@ -92,6 +93,17 @@ def roaming() -> Path:
     return Path(os.environ.get("APPDATA") or (home() / "AppData" / "Roaming"))
 
 
+def claude_json() -> Path:
+    """Dove Claude Code tiene lo scope utente: `mcpServers` in radice di questo file.
+
+    La CLI scrive (`claude mcp add --scope user`), ma il file si **legge**: cosi' anche
+    questa entry si conta come le altre invece di restare una dichiarazione. Il percorso
+    lo dichiara la sua documentazione; `CLAUDE_CONFIG_DIR` lo sposta.
+    """
+    base = os.environ.get("CLAUDE_CONFIG_DIR")
+    return (Path(base) if base else home()) / ".claude.json"
+
+
 # ---------------------------------------------------------------------------------
 # I client: dove leggono, e in che forma
 # ---------------------------------------------------------------------------------
@@ -105,16 +117,24 @@ def clients() -> list[dict]:
          "note": "e' anche la config di craft-bridge-config.py --apply"},
         {"id": "claude-desktop", "title": "Claude Desktop", "kind": "json",
          "path": roaming() / "Claude" / "claude_desktop_config.json"},
+        # La CLI scrive; il file (`~/.claude.json`, scope utente) serve a **contare** le
+        # entry: prima questa riga non si ispezionava, e in `~/.claude.json` sono rimaste
+        # per mesi le entry **headless** del fornitore senza che nessuno le accusasse.
         {"id": "claude-code", "title": "Claude Code (CLI)", "kind": "cli",
-         "path": None, "command": "claude"},
+         "path": claude_json(), "command": "claude"},
         {"id": "cursor", "title": "Cursor", "kind": "json",
          "path": home() / ".cursor" / "mcp.json"},
         {"id": "windsurf", "title": "Windsurf / Cascade", "kind": "json",
          "path": home() / ".codeium" / "windsurf" / "mcp_config.json"},
         {"id": "antigravity", "title": "Antigravity", "kind": "json",
          "path": home() / ".gemini" / "config" / "mcp_config.json"},
-        {"id": "vscode", "title": "VS Code / Copilot (utente)", "kind": "json",
+        {"id": "vscode", "title": "Copilot CLI (utente)", "kind": "json",
          "path": home() / ".copilot" / "mcp-config.json", "key": "mcpServers"},
+        # L'editor e la sua CLI scrivono due file diversi, con due chiavi diverse: `servers`
+        # (VS Code) contro `mcpServers` (Copilot CLI). Erano una riga sola, e l'editor
+        # restava senza: la forma dipende dal file, non dal prodotto.
+        {"id": "vscode-editor", "title": "VS Code (editor, utente)", "kind": "vscode",
+         "path": roaming() / "Code" / "User" / "mcp.json"},
         {"id": "vscode-workspace", "title": "VS Code workspace (.vscode/mcp.json)",
          "kind": "vscode", "path": None,
          "note": "per-progetto: passa --client-path vscode-workspace=<dir>/.vscode/mcp.json"},
@@ -145,14 +165,22 @@ def client_path(c: dict, override: dict | None = None) -> Path | None:
     return c["path"]
 
 
+def client_present(c: dict, path: Path | None) -> bool:
+    """Se il client c'e' su questa macchina.
+
+    Per i client a file e' la **cartella** (il file puo' non esserci ancora: nasce la prima
+    volta che si scrive); per la CLI di Claude Code e' l'**eseguibile**, perche' li' la
+    cartella non dice niente (la sua config sta nella cartella di casa, che c'e' sempre) e
+    senza CLI non c'e' nessun client da configurare.
+    """
+    if c["kind"] == "cli":
+        return bool(shutil.which(c.get("command") or ""))
+    return bool(path and path.parent.is_dir())
+
+
 def present_clients(override: dict | None = None) -> list[dict]:
-    """I client la cui cartella esiste su questa macchina (il file puo' non esserci)."""
-    out = []
-    for c in clients():
-        p = client_path(c, override)
-        if p is not None and p.parent.is_dir():
-            out.append(c)
-    return out
+    """I client presenti su questa macchina (il file puo' non esserci)."""
+    return [c for c in clients() if client_present(c, client_path(c, override))]
 
 
 def bridge_slugs(c: dict, path: Path, expected: set[str]) -> set[str] | None:
@@ -165,7 +193,18 @@ def bridge_slugs(c: dict, path: Path, expected: set[str]) -> set[str] | None:
     """
     kind = c["kind"]
     if kind == "cli":
-        return None
+        # Claude Code: lo scope utente sta nel suo JSON, non in una cartella. Si legge il
+        # file (non la CLI): la CLI serve a scrivere, non a contare, e senza questa lettura
+        # l'unico client che poteva divergere in silenzio era proprio questo.
+        if path is None or not path.is_file():
+            return None
+        try:
+            cfg = _json_read(path)
+        except (OSError, json.JSONDecodeError):
+            return None
+        servers = cfg.get("mcpServers") or {}
+        return {slug for slug, entry in servers.items()
+                if slug in expected and _mentions_bridge(entry, "json")}
     if kind in ("json", "vscode", "zed"):
         try:
             cfg = _json_read(path)
@@ -394,13 +433,18 @@ def _yaml_block(slug: str, entry: dict) -> list[str]:
     ]
 
 
-def write_cli(client: dict, entries: dict, restore: bool, dry: bool) -> dict:
-    """Claude Code: la config si tocca solo dalla sua CLI (`claude mcp add`)."""
+def write_cli(client: dict, path: Path | None, entries: dict, restore: bool, dry: bool) -> dict:
+    """Claude Code: si **scrive** dalla sua CLI (`claude mcp add`), si **legge** dal file.
+
+    Le due cose non sono in contraddizione: la CLI e' l'unica via per scrivere nel posto
+    giusto, ma cio' che c'e' e' scritto in `~/.claude.json` e si legge senza interpretare
+    una stampa per umani.
+    """
     exe = shutil.which(client["command"])
     if not exe:
         return {"absent": True, "added": [], "updated": [], "unchanged": [],
                 "removed": [], "why": f"CLI '{client['command']}' non trovata"}
-    present = _cli_present(exe)
+    present = _cli_present(path)
     added, updated, unchanged, removed, failed = [], [], [], [], []
     for slug, entry in entries.items():
         if restore:
@@ -415,7 +459,7 @@ def write_cli(client: dict, entries: dict, restore: bool, dry: bool) -> dict:
                 added.append(slug)
             else:
                 failed.append(slug)
-        elif present[slug] == [entry["command"]] + list(entry["args"]):
+        elif present[slug] == [str(entry["command"])] + [str(a) for a in entry["args"]]:
             unchanged.append(slug)
         else:
             if dry:
@@ -426,14 +470,38 @@ def write_cli(client: dict, entries: dict, restore: bool, dry: bool) -> dict:
                 updated.append(slug)
             else:
                 failed.append(slug)
-    return {"added": added, "updated": updated, "unchanged": unchanged,
-            "removed": removed, "failed": failed}
+    res = {"added": added, "updated": updated, "unchanged": unchanged,
+           "removed": removed, "failed": failed}
+    if not dry and (added or updated or removed):
+        res["wrote"] = True
+    return res
 
 
-def _cli_present(exe: str) -> dict:
-    out = subprocess.run([exe, "mcp", "list"], capture_output=True, text=True,
-                         encoding="utf-8", errors="replace").stdout or ""
-    return {m.group(1): [] for m in re.finditer(r"(?m)^\s*(\S+):\s*$", out)}
+def _cli_present(path: Path | None = None) -> dict:
+    r"""I server dello scope utente di Claude Code, **dal file**: `{nome: [command, *args]}`.
+
+    Non si interpreta `claude mcp list`: quella stampa e' fatta per una persona
+    (`cadcraft: C:\...\cadcraft-cli.exe mcp - ✔ Connected`), i nomi possono contenere `:`
+    (i plugin: `plugin:claude-mem:mcp-search: ...`) e il primo parsing - che cercava righe
+    fatte solo di `nome:` - leggeva **zero** server. Con zero server il connettore provava
+    ad *aggiungere* entry che esistevano gia': la CLI rispondeva `already exists in user
+    config` e le entry **headless** restavano al loro posto, mentre il riassunto diceva
+    "invariato". Misurato: 12 entry su 13 rifiutate senza che si vedesse.
+
+    Il file invece e' esatto, ed e' lo stesso che si legge per contarle.
+    """
+    p = path or claude_json()
+    if not p.is_file():
+        return {}
+    try:
+        cfg = _json_read(p)
+    except (OSError, json.JSONDecodeError):
+        return {}
+    out = {}
+    for name, entry in (cfg.get("mcpServers") or {}).items():
+        if isinstance(entry, dict) and entry.get("command"):
+            out[name] = [str(entry["command"])] + [str(a) for a in (entry.get("args") or [])]
+    return out
 
 
 def _cli_add(exe: str, slug: str, entry: dict) -> bool:
@@ -455,16 +523,18 @@ def apply_client(client: dict, entries: dict, restore: bool, dry: bool, path: Pa
     row = {"id": client["id"], "title": client["title"], "kind": kind,
            "path": str(path) if path else None}
     if kind == "cli":
-        if dry:
-            row.update({"present": True, "dry": True})
-            # contare le entry senza scrivere: l'unico modo e' `mcp add`, quindi qui si
-            # dichiara quanti server toccherebbe, non lo stato puntuale di ognuno.
-            row.update({"plan": len(entries)})
-            return row
+        # Anche in dry-run si **distingue** aggiungere da sostituire: la classificazione
+        # non tocca niente (si legge il file), solo la scrittura passa dalla CLI.
         try:
-            row.update(write_cli(client, entries, restore, dry=False))
+            res = write_cli(client, path, entries, restore, dry=dry)
         except OSError as exc:
-            row.update({"error": str(exc)})
+            row.update({"error": f"{type(exc).__name__}: {exc}"})
+            return row
+        if res.get("absent"):
+            row.update(res)
+            return row
+        row.update(res)
+        row["present"] = True
         return row
 
     if path is None:
@@ -557,7 +627,7 @@ def main() -> int:
             path = Path(path_over[c["id"]]) if c["id"] in path_over else c["path"]
             rows.append({"id": c["id"], "title": c["title"], "kind": c["kind"],
                          "path": str(path) if path else None,
-                         "present": bool(path and path.parent.is_dir())})
+                         "present": client_present(c, path)})
         if args.json:
             print(json.dumps({"clients": rows}, indent=2, ensure_ascii=False))
             return 0
@@ -565,7 +635,7 @@ def main() -> int:
         for r in rows:
             mark = "si " if r["present"] else "no "
             print(f"  {mark} {r['id']:<17} {r['kind']:<5} {r['path'] or '-'}")
-        print("\n(si/no = la cartella del client esiste su questa macchina)")
+        print("\n(si/no = il client c'e' su questa macchina: la sua cartella, o la sua CLI)")
         return 0
 
     entries = plan(Path(args.install_dir), args.token_file, args.control_file,
@@ -597,13 +667,16 @@ def main() -> int:
         if r.get("absent"):
             print(f"  --   {r['id']:<17} {r.get('why') or 'assente'}")
             continue
-        if r["kind"] == "cli" and r.get("dry"):
-            print(f"  --   {r['id']:<17} (via CLI: userebbe {r['plan']} server, --apply per scrivere)")
-            continue
         n = {k: len(r.get(k) or []) for k in ("added", "updated", "unchanged", "removed")}
         tag = "scritto" if r.get("wrote") else "pianificato" if dry else "invariato"
         print(f"  ok   {r['id']:<17} +{n['added']} ~{n['updated']} "
               f"={n['unchanged']} -{n['removed']}  [{tag}] {r['path']}")
+        # Un rifiuto si dice: senza questa riga un client risultava "invariato" avendo
+        # appena rifiutato 12 entry su 13 (misurato), che e' il modo peggiore di sbagliare.
+        refused = r.get("failed") or []
+        if refused:
+            problems += 1
+            print(f"       rifiutate ({len(refused)}): {', '.join(refused)}")
     if dry:
         print("\n(dry-run: usa --apply per scrivere; ogni scrittura fa un backup .bak-<data>)")
     return 1 if problems else 0

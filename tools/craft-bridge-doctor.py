@@ -511,7 +511,7 @@ def check_clients(install_dir: Path, token_file: str, control_file: str,
         if c["id"] == "agents":
             continue
         path = CONNECT.client_path(c, client_paths)
-        if path is None or not path.parent.is_dir():
+        if not CONNECT.client_present(c, path):
             continue                                     # client non installato: non e' un guasto
         present.append(c["id"])
         have = CONNECT.bridge_slugs(c, path, expected)

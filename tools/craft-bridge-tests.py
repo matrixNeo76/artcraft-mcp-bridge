@@ -1426,6 +1426,47 @@ def t_client_check(run: Runner) -> tuple[str, str]:
     return "PASS", f"accusa cursor 0/13 ({code}) e tace con le 13 ({code2})"
 
 
+@case("client Claude Code dal file", "static")
+def t_cli_client_file(run: Runner) -> tuple[str, str]:
+    r"""Claude Code si conta **dal file**, non dalla stampa di `mcp list`.
+
+    La CLI stampa per una persona (`cadcraft: C:\...\cadcraft-cli.exe mcp - ✔ Connected`)
+    e i nomi possono contenere `:` (i plugin): il primo parsing - che cercava righe fatte
+    solo di `nome:` - leggeva **zero** server. Con zero server il connettore provava ad
+    *aggiungere* entry che esistevano gia', la CLI rispondeva `already exists in user
+    config`, 12 entry headless su 13 restavano al loro posto e il riassunto diceva
+    "invariato": un guasto visibile solo contando. Qui si prova la lettura nei due versi,
+    su un file di prova e **senza** la CLI installata, perche' la conta non la fa la CLI.
+    """
+    CONNECT = _load("craft_bridge_connect", "craft-bridge-connect.py")
+    expected = {"cadcraft", "pdfcraft", "figcraft"}
+    servers = {s: {"type": "stdio", "command": r"C:\Program Files\X\x-cli.exe",
+                   "args": ["mcp"]} for s in expected}
+    servers["artcraft"] = {"type": "stdio", "command": "python",
+                           "args": ["artcraft-mcp-proxy.py"]}
+    client = {"id": "claude-code", "kind": "cli", "path": None, "command": "claude"}
+    path = run.tmp / "claude.json"
+    path.write_text(json.dumps({"mcpServers": servers}), encoding="utf-8")
+
+    names = CONNECT._cli_present(path)
+    if set(names) != set(servers):
+        return "FAIL", f"il file non viene letto: {len(names)} server su {len(servers)}"
+    if CONNECT.bridge_slugs(client, path, expected):
+        return "FAIL", "un'entry headless conta come entry del ponte"
+    if CONNECT.bridge_slugs(client, run.tmp / "assente.json", expected) is not None:
+        return "FAIL", "un file assente non deve dare un insieme (ne' accusare)"
+
+    for slug in expected:                                    # le stesse, ma del ponte
+        servers[slug] = {"type": "stdio", "command": "python",
+                         "args": [r"C:\x\craft-bridge-mcp.py", "--slug", slug]}
+    path.write_text(json.dumps({"mcpServers": servers}), encoding="utf-8")
+    have = CONNECT.bridge_slugs(client, path, expected)
+    if have != expected:
+        return "FAIL", f"le entry del ponte non contate: {sorted(have)}"
+    return "PASS", (f"{len(names)} server letti dal file (la CLI non c'entra), 0 headless "
+                     f"contate, {len(have)} su {len(expected)} dopo")
+
+
 @case("report --serve", "static")
 def t_report_serve(run: Runner) -> tuple[str, str]:
     """`--serve` apre un server locale che serve pagina e JSON: si prova per davvero.
@@ -1465,7 +1506,8 @@ ALL = [t_clean, t_stale_install, t_bad_entry, t_broken_path, t_missing_exe,
        t_closed_port, t_good_build, t_drift_build, t_wrong_app, t_bad_token,
        t_ui_args, t_ui_session, t_ui_headless, t_ui_live,
        t_flag_verdict, t_flag_doctor, t_flag_live,
-       t_connect_clients, t_report_status, t_report_serve, t_client_check]
+       t_connect_clients, t_report_status, t_report_serve, t_client_check,
+       t_cli_client_file]
 
 # Gli strumenti che la suite verifica: le loro impronte finiscono nel report, cosi'
 # due esecuzioni a distanza si confrontano anche su *cosa* e' cambiato.

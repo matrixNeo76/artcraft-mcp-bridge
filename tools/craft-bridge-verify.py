@@ -71,7 +71,21 @@ def main() -> int:
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
 
-    servers = json.loads(Path(args.config).read_text(encoding="utf-8-sig"))["mcpServers"]
+    try:
+        cfg = json.loads(Path(args.config).read_text(encoding="utf-8-sig"))
+    except (OSError, json.JSONDecodeError) as exc:
+        print(f"config illeggibile ({args.config}): {exc}", file=sys.stderr)
+        return 3
+    # La chiave e' quella del client, non una nostra: `servers` per VS Code (editor e
+    # workspace), `mcpServers` per tutti gli altri. Leggere solo la seconda voleva dire
+    # non poter provare mai le entry del file di VS Code - e morire con un `KeyError`,
+    # che non dice nemmeno cosa mancava.
+    key = next((k for k in ("mcpServers", "servers") if k in cfg), None)
+    if key is None:
+        print(f"nessuna entry MCP in {args.config} "
+              f"(chiavi: {', '.join(sorted(cfg)) or 'nessuna'})", file=sys.stderr)
+        return 3
+    servers = cfg[key] or {}
     only = set(args.only.split(",")) if args.only else None
     skip = {s for s in args.skip.split(",") if s}
 

@@ -86,8 +86,8 @@ python tools/craft-bridge-report.py --serve     # + servidor local, abre la pág
 |---|---|
 | Aplicaciones pilotables con una llamada correcta sobre la ventana | 13 de 13 (12 en bridged por el shim — `figcraft` incluido — PdfCraft por traducción) |
 | Entradas de configuración ejecutadas con el comando real | 14/14 |
-| Suite de fallos (28 casos, fallos inyectados) | 27 ejecutados + 1 omitido con la ventana de PdfCraft cerrada (el único caso en vivo dice por qué), 23+1 en `--static`, dos pasadas seguidas idénticas |
-| Clientes en los que está registrado el puente | 13 conocidos, 4 presentes en esta máquina; tras `--apply` todos en **13/13** (antes: `agents` 13, `claude-desktop` y `antigravity` **12** como entradas headless, `windsurf` **0**) |
+| Suite de fallos (29 casos, fallos inyectados) | 28 ejecutados + 1 omitido con la ventana de PdfCraft cerrada (el único caso en vivo dice por qué), 24+1 en `--static`, dos pasadas seguidas idénticas |
+| Clientes en los que está registrado el puente | 14 conocidos, 7 presentes en esta máquina, todos en **13/13** (antes: `agents` 13, `claude-desktop`, `antigravity` y `claude-code` **12** como entradas headless, `windsurf` **0**, `cursor` y el editor VS Code sin configurar) |
 | Instalado frente a la release publicada por el launcher | 12 de 13 comparadas (feed del 13 de octubre): el feed aún no nombra `figcraft`, así que para ella no hay término de comparación y el diagnóstico lo dice |
 | Bytes de la CLI instalada frente a los publicados | 1 de 12 probada: SoundCraft idéntico (`sha256 915ee3abb121…`); para las demás el archivo no está en disco |
 | Rutas de aplicación y CLI | 12 de 12 desde el registro `App Paths` (la tabla confirma, no decide) |

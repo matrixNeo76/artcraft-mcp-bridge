@@ -4,7 +4,7 @@ title: "craft-bridge-doctor - one verdict on the assembly"
 description: "Checks repo, installed copies, config entries, executables, PdfCraft window, credentials and listening builds; at the end it lists the actions that fix the problems found."
 resource: ../../tools/craft-bridge-doctor.py
 tags: [tool, diagnosis, verdict]
-generated: { by: process:freebuff-buffy, at: 2026-10-13T14:26:01Z }
+generated: { by: process:freebuff-buffy, at: 2026-10-14T10:40:00Z }
 status: stable
 sources:
 - resource: ../../tools/craft-bridge-doctor.py
@@ -62,12 +62,23 @@ The `client MCP` line answers the question the user actually asks - "does my Cla
 / `dsh` see the bridge?": for every client present on the machine it counts how many of the
 entries the [connector](craft-bridge-connect.md) would write are **there as bridge entries**
 (naming the shim or the translator). An entry left **headless** by the vendor's installer
-does **not** count - and that is exactly the fault found on this machine: Claude Desktop and
-Antigravity sat at 12/13 with the vendor CLI. The counting is `craft-bridge-connect.py`'s own
-(one definition, so the diagnosis and the connector cannot diverge); `agents` stays out,
-because its config is checked exactly by `config`. The action is
+does **not** count - and that is exactly the fault found on this machine, twice: Claude
+Desktop and Antigravity sat at 12/13 with the vendor CLI, and Claude Code was at 12/13 too
+while `figcraft` was missing altogether. The counting is `craft-bridge-connect.py`'s own (one
+definition, so the diagnosis and the connector cannot diverge); `agents` stays out, because
+its config is checked exactly by `config`. The action is
 `python craft-bridge-connect.py --apply`; a client that is not installed is not a fault, and
 with no client besides `.agents` the line is a `nota`.
+
+For Claude Code and every file-based client the check **reads the file**; the one that used to
+be unreadable was Claude Code, whose entries live in `~/.claude.json` under the user scope:
+without that reading its row was invisible (not even counted as present) and a leftover
+headless entry could stay there forever. Present means "the client is here": the **folder**
+for a file-based client, the **executable** for Claude Code, which has no folder of its own.
+Measured after `--apply` on this machine: `6 client presenti, tutti con le 13 entry del ponte
+(claude-desktop, claude-code, cursor, windsurf, antigravity, vscode-editor)`. A file that is
+not there gives **no set** (nothing to accuse); a config that cannot be read is a `nota` that
+says so.
 
 Then at the end it puts **only the problems, numbered, with the action that fixes each**.
 The doctor changes nothing by itself: it advises, and you run the action (or the suite

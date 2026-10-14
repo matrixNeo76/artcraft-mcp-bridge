@@ -4,7 +4,7 @@ title: "Continuous integration: what every push checks"
 description: "The .github/workflows/checks.yml workflow: portable checks on a hosted runner, the full suite on a self-hosted runner, and what --ci means."
 resource: "../../.github/workflows/checks.yml"
 tags: [ci, workflow, checks, badge]
-generated: { by: process:freebuff-buffy, at: 2026-10-14T09:20:00Z }
+generated: { by: process:freebuff-buffy, at: 2026-10-14T10:40:00Z }
 status: stable
 sources:
 - resource: "../../.github/workflows/checks.yml"
@@ -175,9 +175,9 @@ alone, or the runner alone, changes nothing.
 
 The steps use `powershell`, not `pwsh` - see above.
 
-Measured on the machine that has the apps: **28 cases, 27 PASS, 1 SKIP, 0 FAIL**. The skip is
+Measured on the machine that has the apps: **29 cases, 28 PASS, 1 SKIP, 0 FAIL**. The skip is
 the declared one: *live PdfCraft window* - the window was closed, so the entry would go headless,
-which is not a fault. Among the 27 that ran there are the ones that start a real app (*app on the
+which is not a fault. Among the 28 that ran there are the ones that start a real app (*app on the
 port*, *different build*, *another app on the port*, *refused credential*, *attach flag, live*):
 those are the cases this job exists for. The same run says `cancello: nessuna regressione rispetto
 alla baseline`, so the committed baselines describe this state.
@@ -250,12 +250,11 @@ what an *absent environment* is, not what a *fault* is.
 The distinction is proved in three ways, all run before publishing it:
 
 1. on a machine with the bridge, with the PdfCraft window closed (the state CI runs in),
-   `--static` gives **23 passed + 1 skipped** and the whole suite **27 passed + 1 skipped**;
+   `--static` gives **24 passed + 1 skipped** and the whole suite **28 passed + 1 skipped**;
    the skip is the declared one and says why - it is the case that needs the window, not a
    fault;
 2. on the GitHub runner (an empty environment: no connector config, no installed copies) it
-   gives **14 passed + 10 skipped** and exits 0, with the reason on every skip - measured on
-   the run that carried the status page;
+   gives **15 passed + 10 skipped** and exits 0, with the reason on every skip;
 3. with a real fault injected - one extra byte in the installed copy of the translator -
    the same command gives **FAIL** and exits 1 even with `--ci`: the mode does not hide
    faults, it only stops calling the absence of a bridge a fault.
