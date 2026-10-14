@@ -1,5 +1,5 @@
 {
-  "when": "2026-10-14T10:04:21",
+  "when": "2026-10-14T10:23:09",
   "host": "wkai01",
   "python": "3.12.10",
   "modes": {
@@ -13,10 +13,10 @@
     "craft-bridge-doctor.py": "41414d417fbf",
     "craft-bridge-config.py": "236ff781b8ee",
     "craft-bridge-feed.py": "c65b3ac8ee1a",
-    "craft-bridge-tests.py": "96aed04d9920",
+    "craft-bridge-tests.py": "054e4b36098a",
     "craft-bridge-ui.py": "ed3cab22827d",
     "craft-bridge-connect.py": "b8fccd17a9d0",
-    "craft-bridge-report.py": "0957d425a9f8"
+    "craft-bridge-report.py": "e2d5cad43626"
   },
   "cases": [
     {
@@ -24,7 +24,7 @@
       "kind": "static",
       "state": "PASS",
       "detail": "doctor: nessuna azione",
-      "seconds": 6.2
+      "seconds": 6.3
     },
     {
       "case": "shim installato stantio",
@@ -38,7 +38,7 @@
       "kind": "static",
       "state": "PASS",
       "detail": "doctor e installer concordano: 1 entry da aggiornare",
-      "seconds": 6.5
+      "seconds": 6.4
     },
     {
       "case": "percorso inesistente",
@@ -122,7 +122,7 @@
       "kind": "unit",
       "state": "PASS",
       "detail": "15 tool, parametri tipizzati, immagine, isError su guasto, -32602 sull'ignoto, modo bridged dichiarato, finestra sparita a meta' sessione diagnosticata",
-      "seconds": 3.5
+      "seconds": 3.4
     },
     {
       "case": "senza finestra il traduttore ripiega",
@@ -170,15 +170,15 @@
       "case": "report di stato",
       "kind": "static",
       "state": "PASS",
-      "detail": "json 14 entry, html 21522 byte",
-      "seconds": 0.4
+      "detail": "json 13 entry dalla config indicata (shim e traduttore), html 21343 byte",
+      "seconds": 0.6
     },
     {
       "case": "report --serve",
       "kind": "static",
       "state": "PASS",
-      "detail": "servito su 127.0.0.1:18966: pagina 200 e JSON con lo schema",
-      "seconds": 1.3
+      "detail": "servito su 127.0.0.1:5981: pagina 200 e JSON con lo schema",
+      "seconds": 1.4
     },
     {
       "case": "client MCP nella diagnosi",
@@ -192,11 +192,12 @@
   "failed": 0,
   "skipped": 1,
   "ok": true,
-  "seconds": 80.7,
-  "compared_with": "2026-10-14T09:56:32",
-  "previous_seconds": 80.6,
+  "seconds": 80.8,
+  "compared_with": "2026-10-14T10:04:21",
+  "previous_seconds": 80.7,
   "changes": [
-    "`craft-bridge-tests.py`: fde5fea4ce26 -> 96aed04d9920"
+    "`craft-bridge-tests.py`: 96aed04d9920 -> 054e4b36098a",
+    "`craft-bridge-report.py`: 0957d425a9f8 -> e2d5cad43626"
   ],
   "regressions": [],
   "gate": {

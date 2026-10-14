@@ -4,7 +4,7 @@ title: "craft-bridge-report - the whole state in one JSON and one HTML page"
 description: "Collects the doctor verdict, the config entries, the MCP clients found, the last suite baseline, the feed comparison and the tail of the launch logs into reports/bridge-status.json and the page reports/bridge-status.html that reads it."
 resource: ../../tools/craft-bridge-report.py
 tags: [tool, report, visualization]
-generated: { by: process:freebuff-buffy, at: 2026-10-14T08:15:00Z }
+generated: { by: process:freebuff-buffy, at: 2026-10-14T09:10:00Z }
 status: stable
 sources:
 - resource: ../../tools/craft-bridge-report.py
@@ -51,10 +51,22 @@ python tools/craft-bridge-report.py --json          # only the JSON to stdout, w
 python tools/craft-bridge-report.py --no-doctor     # skips the diagnosis (~2.4 s), the rest stays
 python tools/craft-bridge-report.py --no-live       # diagnosis without the open apps' ports
 python tools/craft-bridge-report.py --no-clients --no-feed
+python tools/craft-bridge-report.py --config ALTRA.json   # il report di un'altra config
 python tools/craft-bridge-report.py --out-json X.json --out-html X.html
 python tools/craft-bridge-report.py --serve          # writes, then serves and opens the page
 python tools/craft-bridge-report.py --serve --port 1418 --no-open
 ```
+
+# `--config` is an injection point, not a second path
+
+`--config FILE` photographs another config instead of the machine's, and the doctor
+verdict is asked about **that** file too: the verdict and the `config` section talk about
+the same config instead of two. It is the same injection point `doctor` and `config`
+already have, and it exists for the same reason - a case can be exercised without
+touching the machine. The suite's `report di stato` uses it: it writes a config of its
+own, so the case says the same thing here and on a runner without a config (before that,
+it read the real one and failed on the runner with an empty `config` section - CI found
+it).
 
 # One command for the view
 
@@ -98,7 +110,7 @@ a fault of the bridge.
 
 # Relations
 
-- **it collects the verdict of** [craft-bridge-doctor](craft-bridge-doctor.md)
+- **it collects the verdict of** [craft-bridge-doctor](craft-bridge-doctor.md) (with its own `--config` point of injection)
 - **the clients of** [craft-bridge-connect](craft-bridge-connect.md)
 - **the baselines of** [craft-bridge-tests](craft-bridge-tests.md)
 - **the comparison of** [craft-bridge-feed](craft-bridge-feed.md)

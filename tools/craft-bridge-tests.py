@@ -1349,23 +1349,48 @@ def t_connect_clients(run: Runner) -> tuple[str, str]:
 
 @case("report di stato", "static")
 def t_report_status(run: Runner) -> tuple[str, str]:
-    """Il report scrive il JSON e la pagina lo incorpora (senza toccare i report veri)."""
+    """Il report scrive il JSON e la pagina lo incorpora.
+
+    Su una config **di prova** (`--config`, come `doctor`) e su file temporanei: cosi' il
+    caso dice la stessa cosa qui e su un runner senza config, ed e' la prova che la
+    sezione `config` viene dal file indicato invece che da quello della macchina. La
+    versione precedente leggeva la config vera e sul runner falliva (`config` vuota),
+    cioe' scambiava per guasto l'ambiente che le mancava: trovato dalla CI.
+    """
+    CONNECT = _load("craft_bridge_connect", "craft-bridge-connect.py")
+    plan = CONNECT.plan(CONFIG.DEFAULT_INSTALL_DIR,
+                        str(Path.home() / ".craft-bridge" / "photocraft.token"),
+                        str(Path.home() / ".craft-bridge" / "pdfcraft-control.json"))
+    config = run.tmp / "status-config.json"          # scritta da zero, non copiata
+    config.write_text(json.dumps({"mcpServers": {s: CONNECT._json_shape("json", e)
+                                                 for s, e in plan.items()}}), encoding="utf-8")
+
     out_json, out_html = run.tmp / "status.json", run.tmp / "status.html"
     code, out, err = run.run(str(HERE / "craft-bridge-report.py"),
                              "--no-doctor", "--no-clients", "--no-feed",
+                             "--config", str(config),
                              "--out-json", str(out_json), "--out-html", str(out_html))
     if code != 0 or not out_json.is_file() or not out_html.is_file():
         return "FAIL", f"uscita {code}: {(err or out)[-160:]}"
     data = json.loads(out_json.read_text(encoding="utf-8"))
-    if data.get("schema") != "craft-bridge-status/1" or data.get("config", {}).get("count", 0) < 1:
-        return "FAIL", "json: schema o entry della config mancanti"
+    cfg = data.get("config") or {}
+    if data.get("schema") != "craft-bridge-status/1" or cfg.get("count") != len(plan):
+        return "FAIL", (f"json: schema {data.get('schema')!r}, {cfg.get('count')} entry "
+                        f"su {len(plan)} della config indicata")
+    if cfg.get("path") != str(config):
+        return "FAIL", f"json: la config letta non e' quella indicata ({cfg.get('path')})"
+    modes = {s.get("slug"): s.get("mode") for s in cfg.get("servers") or []}
+    if modes.get("cadcraft") != "shim" or modes.get("pdfcraft") != "traduttore":
+        return "FAIL", f"json: i modi non tornano (cadcraft {modes.get('cadcraft')}, " \
+                        f"pdfcraft {modes.get('pdfcraft')})"
     page = out_html.read_text(encoding="utf-8")
     for needle in ('id="data"', "bridge-status.json", "Craft Bridge"):
         if needle not in page:
             return "FAIL", f"html: manca {needle!r}"
     if "__DATA__" in page:
         return "FAIL", "html: il segnaposto dei dati non e' stato riempito"
-    return "PASS", f"json {data['config']['count']} entry, html {len(page)} byte"
+    return "PASS", (f"json {cfg['count']} entry dalla config indicata (shim e traduttore), "
+                     f"html {len(page)} byte")
 
 
 @case("client MCP nella diagnosi", "static", env=True)

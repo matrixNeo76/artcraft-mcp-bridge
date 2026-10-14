@@ -19,7 +19,12 @@ cosi' si vede sempre, e servita da un'origine la pagina resta aggiornata al file
     python craft-bridge-report.py --json           # solo il JSON a video, non scrive
     python craft-bridge-report.py --no-doctor      # salta la diagnosi (~2.4 s), il resto resta
     python craft-bridge-report.py --no-live        # la diagnosi senza le porte delle app aperte
+    python craft-bridge-report.py --config ALTRO.json   # il report di un'altra config
     python craft-bridge-report.py --out-html X.html --out-json X.json
+
+`--config` e' lo stesso punto d'iniezione che hanno `doctor` e `config`: serve a provare
+il report su una config di prova senza toccare quella della macchina, ed e' anche il modo
+perche' il verdetto e la sezione `config` parlino **dello stesso file** invece di due.
 
 Esito:
     0  report scritto (anche se il ponte ha cose da sistemare: quello lo dice il verdetto)
@@ -76,9 +81,9 @@ def run_json(tool: str, *extra: str) -> tuple[int, dict | None, str]:
         return proc.returncode, None, (proc.stderr or proc.stdout or "").strip()[:400]
 
 
-def verdict(live: bool) -> dict:
+def verdict(live: bool, config: Path) -> dict:
     extra = () if live else ("--no-live",)
-    code, data, why = run_json("craft-bridge-doctor.py", *extra)
+    code, data, why = run_json("craft-bridge-doctor.py", *extra, "--config", str(config))
     if data is None:
         return {"ok": None, "problems": None, "checks": [], "actions": [],
                 "exit": code, "error": why or "diagnosi illeggibile"}
@@ -86,8 +91,8 @@ def verdict(live: bool) -> dict:
     return data
 
 
-def servers() -> dict:
-    path = CONFIG.DEFAULT_CONFIG
+def servers(config: Path) -> dict:
+    path = config
     cfg = CONFIG.load_config(path)
     out = []
     for slug, entry in sorted(cfg.get("mcpServers", {}).items()):
@@ -164,17 +169,18 @@ def logs(tail: int = 30) -> list[dict]:
 
 
 def collect(live: bool, with_clients: bool, with_feed: bool,
-            with_verdict: bool = True) -> dict:
+            with_verdict: bool = True,
+            config: Path = CONFIG.DEFAULT_CONFIG) -> dict:
     return {
         "schema": SCHEMA,
         "generated": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
         "host": socket.gethostname(),
         "platform": f"{platform.system()} {platform.release()}",
         "project": str(ROOT),
-        "verdict": verdict(live) if with_verdict else {"ok": None, "problems": None,
+        "verdict": verdict(live, config) if with_verdict else {"ok": None, "problems": None,
                                                         "checks": [], "actions": [],
                                                         "skipped": "--no-doctor"},
-        "config": servers(),
+        "config": servers(config),
         "clients": clients(None) if with_clients else [],
         "tests": tests(),
         "feed": feed() if with_feed else None,
@@ -336,6 +342,9 @@ def main() -> int:
     parser.add_argument("--out-json", "--out", dest="out_json",
                         default=str(REPORTS / "bridge-status.json"))
     parser.add_argument("--out-html", default=str(REPORTS / "bridge-status.html"))
+    parser.add_argument("--config", default=str(CONFIG.DEFAULT_CONFIG),
+                        help="la config da fotografare (default quella della macchina): "
+                             "lo stesso punto d'iniezione di doctor e config")
     parser.add_argument("--no-doctor", action="store_true",
                         help="non eseguire la diagnosi (il resto del report resta)")
     parser.add_argument("--no-live", action="store_true",
@@ -359,7 +368,8 @@ def main() -> int:
         return 2
 
     status = collect(live=not args.no_live, with_clients=not args.no_clients,
-                     with_feed=not args.no_feed, with_verdict=not args.no_doctor)
+                     with_feed=not args.no_feed, with_verdict=not args.no_doctor,
+                     config=Path(args.config))
 
     if args.json:
         print(json.dumps(status, indent=2, ensure_ascii=False))

@@ -1,5 +1,5 @@
 {
-  "when": "2026-10-14T10:07:10",
+  "when": "2026-10-14T10:25:54",
   "host": "wkai01",
   "python": "3.12.10",
   "modes": {
@@ -13,10 +13,10 @@
     "craft-bridge-doctor.py": "41414d417fbf",
     "craft-bridge-config.py": "236ff781b8ee",
     "craft-bridge-feed.py": "c65b3ac8ee1a",
-    "craft-bridge-tests.py": "96aed04d9920",
+    "craft-bridge-tests.py": "054e4b36098a",
     "craft-bridge-ui.py": "ed3cab22827d",
     "craft-bridge-connect.py": "b8fccd17a9d0",
-    "craft-bridge-report.py": "0957d425a9f8"
+    "craft-bridge-report.py": "e2d5cad43626"
   },
   "cases": [
     {
@@ -108,14 +108,14 @@
       "kind": "live",
       "state": "PASS",
       "detail": "ident unreachable, shim headless (porta 7979)",
-      "seconds": 6.7
+      "seconds": 6.8
     },
     {
       "case": "app giusta sulla porta",
       "kind": "e2e",
       "state": "PASS",
       "detail": "gridcraft 7975: ident/doctor/launcher tutti d'accordo",
-      "seconds": 22.0
+      "seconds": 21.9
     },
     {
       "case": "build diversa",
@@ -129,7 +129,7 @@
       "kind": "e2e",
       "state": "PASS",
       "detail": "GridCraft su 7972: doctor e ident lo riconoscono",
-      "seconds": 17.1
+      "seconds": 17.2
     },
     {
       "case": "credenziale rifiutata",
@@ -198,15 +198,15 @@
       "case": "report di stato",
       "kind": "static",
       "state": "PASS",
-      "detail": "json 14 entry, html 21522 byte",
-      "seconds": 0.4
+      "detail": "json 13 entry dalla config indicata (shim e traduttore), html 21343 byte",
+      "seconds": 0.6
     },
     {
       "case": "report --serve",
       "kind": "static",
       "state": "PASS",
-      "detail": "servito su 127.0.0.1:4639: pagina 200 e JSON con lo schema",
-      "seconds": 1.4
+      "detail": "servito su 127.0.0.1:23118: pagina 200 e JSON con lo schema",
+      "seconds": 1.3
     },
     {
       "case": "client MCP nella diagnosi",
@@ -221,10 +221,11 @@
   "skipped": 1,
   "ok": true,
   "seconds": 159.3,
-  "compared_with": "2026-10-14T09:59:16",
-  "previous_seconds": 158.8,
+  "compared_with": "2026-10-14T10:07:10",
+  "previous_seconds": 159.3,
   "changes": [
-    "`craft-bridge-tests.py`: fde5fea4ce26 -> 96aed04d9920"
+    "`craft-bridge-tests.py`: 96aed04d9920 -> 054e4b36098a",
+    "`craft-bridge-report.py`: 0957d425a9f8 -> e2d5cad43626"
   ],
   "regressions": [],
   "gate": {

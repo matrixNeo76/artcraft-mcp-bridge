@@ -29,3 +29,8 @@ photocraft.token
 tmp/
 .DS_Store
 Thumbs.db
+
+# I report delle modalita' di prova sono transitori: nascono dove gira la suite e
+# spariscono col checkout, e non e' un guasto se non ci sono.
+reports/*.ci.*
+reports/*.only-*.*
